@@ -486,10 +486,47 @@ function applyTheme() {
   const dark = t === 'dark' || (t === 'auto' && (h >= 18 || h < 6));
   const dev = $('#device');
   if (dev.dataset.theme !== (dark ? 'dark' : 'light')) dev.dataset.theme = dark ? 'dark' : 'light';
-  const m = $('meta[name=theme-color]'); if (m) m.content = dark ? '#0D0F1F' : '#F5F6FA';
+  const m = $('meta[name=theme-color]'); if (m) m.content = (dark || App.route.name === 'live') ? '#0D0F1F' : '#F5F6FA';
   document.body.classList.toggle('night', dark);
 }
 setInterval(applyTheme, 60000);
+
+/* ===== Web = App: tinggi layar nyata, mode standalone, ajakan "pasang ke layar utama" ===== */
+const PWA = {
+  ios: /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
+  standalone: window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches,
+  deferred: null,
+  dismissed() { try { return localStorage.getItem('aibm.installHint') === '1'; } catch (e) { return false; } },
+  dismiss() { try { localStorage.setItem('aibm.installHint', '1'); } catch (e) { /* */ } },
+  canHint() { return !this.standalone && !this.dismissed() && window.innerWidth <= 520 && (this.ios || this.deferred); },
+};
+function setAppHeight() {
+  // iOS Safari: 100vh lebih tinggi dari area terlihat -> pakai innerHeight agar tab bawah tidak tertutup toolbar
+  document.documentElement.style.setProperty('--app-h', `${window.innerHeight}px`);
+}
+setAppHeight();
+window.addEventListener('resize', setAppHeight);
+window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 300));
+if (PWA.standalone) document.documentElement.classList.add('standalone');
+if (PWA.ios) document.documentElement.classList.add('ios');
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); PWA.deferred = e; if (App.route.name === 'home') App.refresh(); });
+window.addEventListener('appinstalled', () => { PWA.dismiss(); toast('Aplikasi terpasang di layar utama', { icon: 'checkCircle', tone: 'ok' }); });
+function installCard() {
+  if (!PWA.canHint()) return '';
+  return `<div class="install">
+    <span class="install-ic"><img src="assets/apple-touch-icon.png" alt=""></span>
+    <span class="install-t"><b>Pasang di layar utama</b><small>${PWA.ios ? `Ketuk ${ic('share', 13)} lalu <b>Add to Home Screen</b>` : 'Buka seperti aplikasi, layar penuh'}</small></span>
+    ${PWA.ios ? '' : '<button class="install-go" data-act="installApp">Pasang</button>'}
+    <button class="install-x" data-act="installDismiss" aria-label="Tutup">${ic('x', 16)}</button>
+  </div>`;
+}
+Actions.installDismiss = el => { PWA.dismiss(); el.closest('.install')?.remove(); };
+Actions.installApp = async () => {
+  if (!PWA.deferred) return;
+  PWA.deferred.prompt();
+  try { await PWA.deferred.userChoice; } catch (e) { /* */ }
+  PWA.deferred = null; App.refresh();
+};
 
 /* Tampilkan jam di status bar */
 setInterval(() => { const sb = $('#sb-time'); if (sb) sb.textContent = fmtTime(Date.now()); }, 15000);

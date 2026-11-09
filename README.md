@@ -2,6 +2,8 @@
 
 **Live demo:** https://aibabymonitor.vercel.app
 
+**Pakai di iPhone seperti aplikasi:** buka link di Safari → ketuk tombol Share → *Add to Home Screen*. Aplikasi terbuka layar penuh dengan ikon sendiri.
+
 Aplikasi pemantau bayi berbasis AI sesuai PRD. Kamera CCTV, sensor, dan speaker **masih disimulasikan** (dummy) karena hardware belum tersedia.
 
 ## Cara menjalankan

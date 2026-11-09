@@ -1142,3 +1142,37 @@ button:active { transition: transform .08s; }
 #device[data-theme=dark] .bar-track, #device[data-theme=dark] .tl-track { background: var(--track); }
 #device[data-theme=dark] .screen.dark { background: var(--bg); }
 #device[data-theme=dark] .tab-live.on .tab-ic { background: var(--pri) !important; }
+
+/* =========================================================
+   v1.7 — Web = App di iPhone (Safari & layar utama)
+   ========================================================= */
+html, body { overscroll-behavior: none; }
+button, a, .tab, .rb, .q, [data-go], [data-act] { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+img { -webkit-user-drag: none; }
+@media (max-width: 520px) {
+  html, body { height: 100%; overflow: hidden; background: var(--bg); }
+  .stage { min-height: 0; height: var(--app-h, 100dvh); }
+  .device { height: var(--app-h, 100dvh); }
+  .screen { padding-top: max(env(safe-area-inset-top), 6px); }
+  .screen.has-tabs { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+  .has-player .screen.has-tabs { padding-bottom: calc(170px + env(safe-area-inset-bottom)); }
+  .bar { top: 0; padding-top: 6px; }
+  #toast-root { padding-top: calc(env(safe-area-inset-top) + 12px); }
+  .pl-bar { bottom: calc(92px + env(safe-area-inset-bottom)); }
+  .pl-bar.low { bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .sim-fab { bottom: calc(156px + env(safe-area-inset-bottom)); }
+  .alarm { padding-top: calc(env(safe-area-inset-top) + 16px); padding-bottom: calc(env(safe-area-inset-bottom) + 16px); }
+  .sheet { max-height: calc(var(--app-h, 100dvh) - 60px); }
+  /* iOS: font input < 16px membuat layar zoom otomatis */
+  input, select, textarea { font-size: 16px !important; }
+}
+html.standalone .screen { padding-top: max(env(safe-area-inset-top), 10px); }
+
+.install { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 12px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--sh); animation: rise .4s both; }
+.install-ic img { width: 38px; height: 38px; border-radius: 10px; display: block; }
+.install-t { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.install-t b { font-size: 13px; }
+.install-t small { font-size: 11.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.install-t small .ic { color: var(--pri); }
+.install-go { background: var(--pri); color: #fff; font-weight: 800; font-size: 12.5px; padding: 8px 12px; border-radius: 11px; }
+.install-x { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; color: var(--muted); background: var(--track); flex-shrink: 0; }

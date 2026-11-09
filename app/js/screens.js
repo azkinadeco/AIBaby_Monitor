@@ -480,6 +480,7 @@ Screens.home = {
       </div>
     </header>
     <div class="pad-x">
+      ${installCard()}
       ${banner}
       <div class="hero" data-go="live" data-reset="1" role="button" aria-label="Buka live view">
         <canvas class="cam"></canvas>
