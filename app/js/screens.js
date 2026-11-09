@@ -25,7 +25,7 @@ const SPEAKER_TYPES = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const initials = n => (n || 'B').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+const initials = n => (String(n || 'B').replace(/[^A-Za-z ]/g, '').trim() || 'B').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
 const levelLabel = l => ({ critical: 'Darurat', warning: 'Peringatan', info: 'Info' }[l]);
 const levelTone = l => ({ critical: 'bad', warning: 'warn', info: 'info' }[l]);
 
@@ -832,6 +832,9 @@ Screens.settings = {
       <div class="grp-h">${ic('users', 15)}<b>Teruskan ke keluarga setelah</b></div>
       ${seg('settings.alarm.escalateSec', [[15, '15s'], [30, '30s'], [60, '60s'], [0, 'Off']], S.alarm.escalateSec)}
 
+      <div class="grp-h">${ic('eye', 15)}<b>Tampilan</b></div>
+      ${optGrid('settings.theme', [['auto', 'sparkles', 'Auto'], ['light', 'sun', 'Terang'], ['dark', 'moon', 'Gelap']], S.theme || 'auto')}
+
       <div class="grp-h">${ic('cctv', 15)}<b>Kamera</b></div>
       ${optGrid('settings.nightVision', [['auto', 'sparkles', 'Auto'], ['on', 'moon', 'Malam'], ['off', 'sun', 'Siang']], S.nightVision)}
       ${disclaimer()}
@@ -856,26 +859,31 @@ Actions.pushPerm = el => {
 Screens.devices = {
   render() {
     const s = Store.s;
-    return topbar('Perangkat Saya') + `<div class="pad">
-      <div class="sec-h"><h3>Kamera</h3></div>
-      ${s.cameras.map(c => `<div class="card dev">
-        <div class="dev-h">${ic('cctv', 24)}<div><b>${esc(c.name)}</b><small>${esc(c.brand)}</small></div>${Engine.sim.camOnline ? '<span class="chip chip-ok">Online</span>' : '<span class="chip chip-bad">Offline</span>'}</div>
-        <div class="kv"><span>Koneksi</span><b>${c.type === 'rtsp' ? 'RTSP via gateway' : 'Cloud P2P'}</b></div>
-        ${c.url ? `<div class="kv"><span>URL</span><b class="mono">${esc(c.url)}</b></div>` : `<div class="kv"><span>No. Seri</span><b class="mono">${esc(c.sn || '-')}</b></div><div class="kv"><span>Wi-Fi</span><b>${esc(c.wifi || '-')} · ${ic('wifi', 13)} Kuat</b></div>`}
-        <div class="kv"><span>Resolusi</span><b>${c.res} · night vision</b></div>
-        <div class="btn-row"><button class="btn btn-soft btn-sm" data-act="restartDev">${ic('power', 16)} Mulai ulang</button><button class="btn btn-soft btn-sm danger" data-act="delCam" data-id="${c.id}">${ic('trash', 16)} Hapus</button></div>
-      </div>`).join('') || '<p class="muted">Belum ada kamera.</p>'}
-      <button class="btn btn-ghost" data-go="setup" data-param='{"step":"camera","add":true}'>${ic('plus', 18)} Tambah kamera</button>
-
-      <div class="sec-h"><h3>Speaker Alarm</h3></div>
-      ${s.speakers.map(sp => `<div class="card dev">
-        <div class="dev-h">${ic(SPEAKER_TYPES[sp.type].icon, 24)}<div><b>${esc(sp.name)}</b><small>${SPEAKER_TYPES[sp.type].name}</small></div><span class="chip chip-ok">Online</span></div>
-        <div class="set-row col"><div class="set-lr"><b>Volume perangkat</b><span id="sv-${sp.id}">${sp.volume}%</span></div>
-          <input type="range" min="10" max="100" step="5" value="${sp.volume}" data-act="noopRange" data-spk="${sp.id}" data-out="#sv-${sp.id}" data-unit="%"></div>
-        <div class="btn-row"><button class="btn btn-soft btn-sm" data-act="testSpeaker">${ic('volume', 16)} Tes</button><button class="btn btn-soft btn-sm danger" data-act="delSpk" data-id="${sp.id}">${ic('trash', 16)} Hapus</button></div>
-      </div>`).join('') || '<div class="tip warn">' + ic('alert', 18) + '<span>Belum ada speaker. Alarm hanya akan muncul di HP.</span></div>'}
-      <button class="btn btn-ghost" data-go="setup" data-param='{"step":"speaker","add":true}'>${ic('plus', 18)} Tambah speaker</button>
-
+    const cam = c => `<div class="dcard" data-act="devInfo" data-id="${c.id}" role="button">
+        <div class="dcard-top"><span class="dcard-ic">${ic('cctv', 26)}</span><i class="dot ${Engine.sim.camOnline ? 'ok' : 'bad'}"></i></div>
+        <b>${esc(c.name)}</b><small>${esc(c.brand)}</small>
+        <div class="dcard-act">
+          <button data-act="restartDev" aria-label="Mulai ulang">${ic('power', 16)}</button>
+          <button data-act="delCam" data-id="${c.id}" class="danger" aria-label="Hapus">${ic('trash', 16)}</button>
+        </div></div>`;
+    const spk = sp => `<div class="dcard speaker-chip">
+        <div class="dcard-top"><span class="dcard-ic">${ic(SPEAKER_TYPES[sp.type].icon, 26)}</span><i class="dot ok"></i></div>
+        <b>${esc(sp.name)}</b>
+        <div class="mini-vol">${ic('volume', 14)}<input type="range" min="10" max="100" step="5" value="${sp.volume}" data-spk="${sp.id}" aria-label="Volume"></div>
+        <div class="dcard-act">
+          <button data-act="testSpeaker" aria-label="Tes">${ic('play', 16)}</button>
+          <button data-act="delSpk" data-id="${sp.id}" class="danger" aria-label="Hapus">${ic('trash', 16)}</button>
+        </div></div>`;
+    const add = (step, label) => `<button class="dcard add" data-go="setup" data-param='{"step":"${step}","add":true}'><span class="dcard-ic">${ic('plus', 26)}</span><b>${label}</b></button>`;
+    return topbar('Perangkat') + `<div class="pad">
+      <div class="grp-h">${ic('cctv', 15)}<b>Kamera</b></div>
+      <div class="dgrid">${s.cameras.map(cam).join('')}${add('camera', 'Kamera')}</div>
+      <div class="grp-h">${ic('volume', 15)}<b>Speaker alarm</b></div>
+      <div class="dgrid">${s.speakers.map(spk).join('')}${add('speaker', 'Speaker')}</div>
+      <div class="net-card ${Engine.sim.internet ? '' : 'warn'}">
+        <span>${ic(Engine.sim.internet ? 'cloud' : 'router', 20)}</span>
+        <b>${Engine.sim.internet ? 'Cloud AI terhubung' : 'Gateway lokal aktif'}</b><i class="dot ${Engine.sim.internet ? 'ok' : 'warn'}"></i>
+      </div>
     </div>`;
   },
 };
@@ -883,40 +891,56 @@ document.addEventListener('change', e => {
   const el = e.target.closest('[data-spk]'); if (!el) return;
   const sp = Store.s.speakers.find(x => x.id === el.dataset.spk); if (sp) { sp.volume = +el.value; Store.save(); }
 });
-Actions.noopRange = () => {};
-Actions.restartDev = () => { toast('Kamera dimulai ulang…', { icon: 'power' }); Engine.setCamera(false); setTimeout(() => { Engine.setCamera(true); toast('Kamera online kembali', { icon: 'cctv', tone: 'ok' }); if (App.route.name === 'devices') App.refresh(); }, 3500); };
-Actions.delCam = async el => { if (await confirmBox('Hapus kamera?', 'Kamera akan diputus dari akun ini.', 'Hapus', true)) { Store.s.cameras = Store.s.cameras.filter(c => c.id !== el.dataset.id); Store.save(); App.refresh(); } };
-Actions.delSpk = async el => { if (await confirmBox('Hapus speaker?', 'Alarm tidak akan dibunyikan ke speaker ini lagi.', 'Hapus', true)) { Store.s.speakers = Store.s.speakers.filter(c => c.id !== el.dataset.id); Store.save(); SpeakerUI.idle(); App.refresh(); } };
+Actions.devInfo = (el, e) => {
+  if (e.target.closest('.dcard-act')) return;
+  const c = Store.s.cameras.find(x => x.id === el.dataset.id); if (!c) return;
+  const kv = (k, v) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`;
+  sheet(`<h3 class="sheet-title">${ic('cctv', 20)} ${esc(c.name)}</h3>
+    <div class="card">
+      ${kv('Merek', esc(c.brand))}
+      ${kv('Koneksi', c.type === 'rtsp' ? 'RTSP' : 'Cloud')}
+      ${kv('Resolusi', esc(c.res))}
+      ${c.url ? kv('URL', `<span class="mono">${esc(c.url)}</span>`) : kv('No. seri', `<span class="mono">${esc(c.sn || '-')}</span>`)}
+    </div>`);
+};
+Actions.restartDev = () => { toast('Kamera dimulai ulang…', { icon: 'power' }); Engine.setCamera(false); setTimeout(() => { Engine.setCamera(true); toast('Kamera online', { icon: 'cctv', tone: 'ok' }); if (App.route.name === 'devices') App.refresh(); }, 3500); };
+Actions.delCam = async el => { if (await confirmBox('Hapus kamera?', 'Kamera diputus dari akun ini.', 'Hapus', true)) { Store.s.cameras = Store.s.cameras.filter(c => c.id !== el.dataset.id); Store.save(); App.refresh(); } };
+Actions.delSpk = async el => { if (await confirmBox('Hapus speaker?', 'Alarm tidak lagi dibunyikan di speaker ini.', 'Hapus', true)) { Store.s.speakers = Store.s.speakers.filter(c => c.id !== el.dataset.id); Store.save(); SpeakerUI.idle(); App.refresh(); } };
 
 /* ---------------- KELUARGA ---------------- */
 Screens.family = {
   render() {
     const s = Store.s;
-    return topbar('Anggota Keluarga') + `<div class="pad">
-      <p class="muted">Semua anggota menerima notifikasi. Jika alarm tidak dikonfirmasi dalam ${s.settings.alarm.escalateSec || '–'} dtk, peringatan diteruskan ke anggota yang aktif.</p>
-      <div class="card list">
-        <div class="li"><span class="avatar sm">${initials(s.user?.name)}</span><span><b>${esc(s.user?.name)} (Anda)</b><small>${esc(s.user?.email)} · Pemilik</small></span><span class="chip chip-pri">Admin</span></div>
-        ${s.family.map(f => `<div class="li"><span class="avatar sm alt">${initials(f.name)}</span><span><b>${esc(f.name)}</b><small>${esc(f.email)} · ${f.role}${f.pending ? ' · undangan terkirim' : ''}</small></span>
-          <label class="switch"><input type="checkbox" ${f.notify ? 'checked' : ''} data-act="famNotify" data-id="${f.id}"><i></i></label></div>`).join('')}
+    const first = n => esc(String(n || '').split(' ')[0]);
+    return topbar('Keluarga') + `<div class="pad">
+      <div class="fam-grid">
+        <div class="fcard me"><span class="avatar xl">${initials(s.user?.name)}</span><b>${first(s.user?.name)}</b><small>Admin</small></div>
+        ${s.family.map(f => `<div class="fcard ${f.notify ? '' : 'muted-card'}">
+          <span class="avatar xl alt">${initials(f.name)}</span><b>${first(f.name)}</b><small>${f.pending ? 'Diundang' : esc(f.role)}</small>
+          <button class="fbell ${f.notify ? 'on' : ''}" data-act="famBell" data-id="${f.id}" aria-label="Notifikasi ${first(f.name)}">${ic(f.notify ? 'bell' : 'volumeX', 15)}</button>
+        </div>`).join('')}
+        <button class="fcard add" data-act="famInvite"><span class="avatar xl">${ic('plus', 26)}</span><b>Undang</b></button>
       </div>
-      <div class="sec-h"><h3>Undang anggota</h3></div>
-      <form class="form card" id="fam-form">
-        <label class="field"><span>Nama</span><input name="name" required placeholder="cth. Mbak Asih"></label>
-        <label class="field"><span>Email / No. HP</span><input name="email" required placeholder="email atau nomor WhatsApp"></label>
-        <div class="field"><span>Peran</span><div class="seg"><label><input type="radio" name="role" value="Orang Tua" checked><span>Orang Tua</span></label><label><input type="radio" name="role" value="Pengasuh"><span>Pengasuh</span></label><label><input type="radio" name="role" value="Lihat saja"><span>Lihat saja</span></label></div></div>
-        <button class="btn btn-pri">${ic('mail', 18)} Kirim Undangan</button>
-      </form>
+      <div class="esc-card"><div class="esc-h">${ic('users', 18)}<span>Alarm diteruskan setelah</span></div>${seg('settings.alarm.escalateSec', [[15, '15s'], [30, '30s'], [60, '60s'], [0, 'Off']], s.settings.alarm.escalateSec)}</div>
     </div>`;
   },
-  mount() {
-    $('#fam-form').onsubmit = e => {
+};
+Actions.famBell = el => { const f = Store.s.family.find(x => x.id === el.dataset.id); if (f) { f.notify = !f.notify; Store.save(); App.refresh(); } };
+Actions.famInvite = () => sheet(`<h3 class="sheet-title">${ic('users', 20)} Undang anggota</h3>
+  <form class="form" id="fam-form">
+    <label class="field"><span>Nama</span><input name="name" required placeholder="Mbak Asih"></label>
+    <label class="field"><span>Email / WhatsApp</span><input name="email" required placeholder="nama@email.com"></label>
+    <div class="seg"><label><input type="radio" name="role" value="Orang Tua" checked><span>Orang tua</span></label><label><input type="radio" name="role" value="Pengasuh"><span>Pengasuh</span></label><label><input type="radio" name="role" value="Lihat saja"><span>Lihat</span></label></div>
+    <button class="btn btn-pri btn-lg">${ic('mail', 18)} Kirim</button>
+  </form>`, {
+  onMount: el => {
+    $('#fam-form', el).onsubmit = e => {
       e.preventDefault(); const f = new FormData(e.target);
       Store.s.family.push({ id: uid(), name: f.get('name'), email: f.get('email'), role: f.get('role'), notify: true, pending: true });
-      Store.save(); toast(`Undangan dikirim ke ${f.get('name')}`, { icon: 'mail' }); App.refresh();
+      Store.save(); closeSheet(); toast(`Undangan dikirim ke ${f.get('name')}`, { icon: 'mail' }); App.refresh();
     };
   },
-};
-Actions.famNotify = el => { setTimeout(() => { const f = Store.s.family.find(x => x.id === el.dataset.id); if (f) { f.notify = el.checked; Store.save(); } }, 0); };
+});
 
 /* ---------------- LANGGANAN ---------------- */
 Screens.subscription = {

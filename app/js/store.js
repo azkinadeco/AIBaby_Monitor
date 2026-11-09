@@ -25,7 +25,7 @@ const Store = (() => {
       alarm: { sound: 'siren', volume: 80, tts: true, escalateSec: 30, wakeSpeaker: false },
       quiet: { on: false, from: '21:00', to: '05:00' },
       push: true, vibrate: true,
-      nightVision: 'auto', quality: 'HD', aiOverlay: true,
+      nightVision: 'auto', quality: 'HD', aiOverlay: true, theme: 'auto',
       liveAudio: false,
       pin: false, twoFA: true, e2e: true, cloudRec: true, retention: 7,
     },

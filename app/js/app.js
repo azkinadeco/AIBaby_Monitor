@@ -84,6 +84,7 @@ const App = {
     scr.innerHTML = def.render(this.route.params);
     scr.scrollTop = 0;
     if (!this._quiet) { scr.classList.remove('enter'); void scr.offsetWidth; scr.classList.add('enter'); }
+    applyTheme();
     renderTabbar(isTab ? (this.route.name === 'notif' ? 'history' : this.route.name) : null);
     $('#sim-fab').classList.toggle('hidden', ['splash', 'auth', 'plan', 'setup', 'onboarding'].includes(this.route.name));
     def.mount && def.mount(this.route.params, scr);
@@ -478,6 +479,17 @@ Actions.playerPick = el => {
   Player.play(k);
 };
 Actions.playerTimer = el => { Player.setTimer(+el.dataset.m); if ($('#sheet .pl-sheet')) Player.open(true); };
+
+/* Tema: auto = gelap pukul 18.00–06.00 (pas untuk memantau malam) */
+function applyTheme() {
+  const t = Store.s.settings.theme || 'auto', h = new Date().getHours();
+  const dark = t === 'dark' || (t === 'auto' && (h >= 18 || h < 6));
+  const dev = $('#device');
+  if (dev.dataset.theme !== (dark ? 'dark' : 'light')) dev.dataset.theme = dark ? 'dark' : 'light';
+  const m = $('meta[name=theme-color]'); if (m) m.content = dark ? '#0D0F1F' : '#F5F6FA';
+  document.body.classList.toggle('night', dark);
+}
+setInterval(applyTheme, 60000);
 
 /* Tampilkan jam di status bar */
 setInterval(() => { const sb = $('#sb-time'); if (sb) sb.textContent = fmtTime(Date.now()); }, 15000);

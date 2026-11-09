@@ -1,5 +1,7 @@
 # AI Baby Monitor — Prototipe Aplikasi (Web, Portrait)
 
+**Live demo:** https://aibabymonitor.vercel.app
+
 Aplikasi pemantau bayi berbasis AI sesuai PRD. Kamera CCTV, sensor, dan speaker **masih disimulasikan** (dummy) karena hardware belum tersedia.
 
 ## Cara menjalankan
@@ -22,6 +24,8 @@ Di HP (satu Wi-Fi): buka http://IP-LAPTOP:8765 — panel simulasi dibuka lewat t
 - Aktivitas: daftar kejadian + grafik tidur 7 hari
 - Pengaturan berbentuk tile: on/off deteksi, sensitivitas, jenis bunyi, volume, jam tenang
 - Setup kamera (QR paket / RTSP-ONVIF) & speaker; pilihan Paket Lengkap atau Paket Aplikasi
+- **Mode gelap otomatis** (18.00–06.00) atau manual di Pengaturan → Tampilan
+- Perangkat & Keluarga berbentuk kartu: volume speaker, tes, hapus, undang anggota, atur notifikasi per anggota
 - Mode internet putus → gateway lokal tetap membunyikan alarm
 - Panel Simulasi (pengganti hardware): picu tangisan, tengkurap, muntah, napas, kamera/internet mati, demo otomatis
 
