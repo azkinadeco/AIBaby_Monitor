@@ -127,6 +127,8 @@ function updateBindings() {
   set('pose', L.pose);
   set('conf', L.conf);
   set('latency', L.latency);
+  set('roomTemp', L.roomTemp?.toFixed ? L.roomTemp.toFixed(1) : L.roomTemp);
+  set('roomHum', L.roomHum);
   set('status', S.text);
   set('statusSub', S.sub);
   set('sleptToday', fmtDur(Store.s.stats.sleptToday + todayBaseSleep()));
@@ -227,6 +229,11 @@ const Alarm = {
     if (this.current && this.current.level === 'critical' && ev.level !== 'critical') {
       toast(`Juga terdeteksi: ${T.label}`, { icon: 'alert', tone: 'warn' });
       updateBadges(); return;
+    }
+    if ((ev.type === 'cry' || ev.type === 'motion') && s.alarm.autoSoothe && !Sound.lullabyOn()) {
+      const trk = s.alarm.autoSootheTrack || 'noise';
+      Player.play(trk);
+      SimPanel.log(`Smart Auto-Soothe: memutar ${Sound.TRACKS[trk]?.name || 'Lagu tidur'} otomatis di kamar bayi`);
     }
     this.current = ev; this.muted = false;
     this.show(ev, { quiet, shouldSound, speakerOn });
@@ -452,15 +459,19 @@ const Player = {
     $('#overlay-root').appendChild(el);
   },
   open(refresh) {
-    const on = Sound.lullabyOn(), cur = Sound.lullabyTrack();
+    const on = Sound.lullabyOn(), cur = Sound.lullabyTrack(), as = Store.s.settings.alarm;
     const tr = Object.entries(Sound.TRACKS).map(([k, t]) => `
       <button class="trk ${on && cur === k ? 'on' : ''}" data-act="playerPick" data-k="${k}">
-        <span class="trk-ic">${ic(t.noise ? 'wind' : 'music', 22)}</span><b>${t.name}</b>
+        <span class="trk-ic">${ic(t.noise === 'womb' ? 'heart' : t.noise === 'rain' ? 'droplet' : t.noise ? 'wind' : 'music', 22)}</span><b>${t.name}</b>
         <span class="trk-st">${on && cur === k ? '<span class="eq sm"><i></i><i></i><i></i></span>' : ic('play', 16)}</span>
       </button>`).join('');
     const html = `<div class="pl-sheet">
-      <h3 class="sheet-title">${ic('music', 18)} Lagu tidur</h3>
+      <h3 class="sheet-title">${ic('music', 18)} Lagu tidur & Penenang</h3>
       <div class="trk-list">${tr}</div>
+      <div class="card set-row" style="padding:10px 14px;align-items:center">
+        <div class="set-main"><b>Smart Auto-Soothe AI</b><small>Putar otomatis saat bayi menangis / gelisah</small></div>
+        ${toggle('settings.alarm.autoSoothe', as.autoSoothe)}
+      </div>
       <div class="grp-h">${ic('clock', 15)}<b>Timer</b></div>
       <div class="opt-grid four">${[[15, '15m'], [30, '30m'], [60, '60m'], [0, '∞']].map(([m, l]) => `<button class="opt ${this.mins === m ? 'on' : ''}" data-act="playerTimer" data-m="${m}"><span>${l}</span></button>`).join('')}</div>
       <div class="card vol">${ic('volumeX', 18)}<input type="range" min="0.1" max="1" step="0.05" value="${Sound.lullVolume}" id="pl-vol" aria-label="Volume lagu">${ic('volume', 18)}</div>

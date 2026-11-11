@@ -124,7 +124,10 @@ const Sound = (() => {
   const TRACKS = {
     twinkle: { name: 'Twinkle Twinkle', beat: .5, notes: 'C5 C5 G5 G5 A5 A5 G5- F5 F5 E5 E5 D5 D5 C5- G5 G5 F5 F5 E5 E5 D5- G5 G5 F5 F5 E5 E5 D5- C5 C5 G5 G5 A5 A5 G5- F5 F5 E5 E5 D5 D5 C5- _ _'.split(' ') },
     brahms: { name: 'Brahms Lullaby', beat: .45, notes: 'E4 E4 G4- E4 E4 G4- E4 G4 C5 B4- A4 A4 G4- D4 E4 F4- D4 D4 E4 F4- D4 F4 B4 A4 G4 B4 C5- _ _'.split(' ') },
-    noise: { name: 'White noise', noise: true },
+    nina: { name: 'Nina Bobo', beat: .48, notes: 'E4 F4 G4- A4 G4 F4 E4 D4- G4 A4 B4- C5 B4 A4 G4- E4 F4 G4- A4 G4 F4 E4 D4- G4 B4 D5 C5 B4 A4 G4 C5- _ _'.split(' ') },
+    noise: { name: 'White noise', noise: 'pink' },
+    rain: { name: 'Hujan lembut', noise: 'rain' },
+    womb: { name: 'Detak jantung ibu', noise: 'womb' },
   };
   const lull = { on: false, track: null, vol: .7, gain: null, timer: null, src: null, tok: 0 };
 
@@ -150,11 +153,27 @@ const Sound = (() => {
     if (T.noise) {
       const len = c.sampleRate * 3, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
       let b0 = 0, b1 = 0, b2 = 0;
-      for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; b0 = .997 * b0 + w * .029; b1 = .985 * b1 + w * .032; b2 = .95 * b2 + w * .048; d[i] = (b0 + b1 + b2 + w * .05) * .9; }
+      for (let i = 0; i < len; i++) {
+        const w = Math.random() * 2 - 1;
+        b0 = .997 * b0 + w * .029; b1 = .985 * b1 + w * .032; b2 = .95 * b2 + w * .048;
+        const pat = T.noise === 'rain' ? (0.7 + 0.3 * Math.sin(i / (c.sampleRate * 0.45))) : 0.9;
+        d[i] = (b0 + b1 + b2 + w * .05) * pat;
+      }
       const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
-      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800;
-      const ng = c.createGain(); ng.gain.value = .35;
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass';
+      lp.frequency.value = T.noise === 'womb' ? 420 : T.noise === 'rain' ? 1350 : 1800;
+      const ng = c.createGain(); ng.gain.value = T.noise === 'womb' ? .48 : .35;
       src.connect(lp).connect(ng).connect(g); src.start(); lull.src = src;
+      if (T.noise === 'womb') {
+        const beat = () => {
+          if (!lull.on || my !== lull.tok) return;
+          const t = c.currentTime + .02;
+          note(62, t, .09, { type: 'sine', vol: .28, attack: .02, release: .12, dest: g });
+          note(54, t + .22, .11, { type: 'sine', vol: .20, attack: .02, release: .16, dest: g });
+          lull.timer = setTimeout(beat, 920);
+        };
+        beat();
+      }
       return;
     }
     let i = 0;

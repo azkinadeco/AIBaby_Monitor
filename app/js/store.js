@@ -10,7 +10,7 @@ const Store = (() => {
     planCycle: 'yearly',
     setupDone: false,
     armed: true,              // pemantauan aktif
-    baby: { name: 'Aisyah', birth: isoDaysAgo(128), gender: 'P' },
+    baby: { name: 'Aisyah', birth: isoDaysAgo(128), gender: 'P', photo: null },
     cameras: [],              // {id,name,room,type,brand,url,status,res,wifi}
     speakers: [],             // {id,name,type,volume,status}
     settings: {
@@ -22,19 +22,24 @@ const Store = (() => {
         breath: { on: true, sens: 'tinggi' },
         wake: { on: true, sens: 'sedang' },
       },
-      alarm: { sound: 'siren', volume: 80, tts: true, escalateSec: 30, wakeSpeaker: false },
+      alarm: { sound: 'siren', volume: 80, tts: true, escalateSec: 30, wakeSpeaker: false, autoSoothe: true, autoSootheTrack: 'noise' },
       quiet: { on: false, from: '21:00', to: '05:00' },
       push: true, vibrate: true,
       nightVision: 'auto', quality: 'HD', aiOverlay: true, theme: 'auto',
       liveAudio: false,
-      pin: false, twoFA: true, e2e: true, cloudRec: true, retention: 7,
+      pin: false, pinCode: '1234', twoFA: true, e2e: true, cloudRec: true, retention: 7,
+      backendUrl: '', ingestToken: 'aibm-secret-token-2026', roomCode: 'AIBM-88',
+      roi: { on: true, x: 0.10, y: 0.12, w: 0.80, h: 0.76 },
     },
     family: [
       { id: 'f1', name: 'Budi (Ayah)', email: 'budi@email.com', role: 'Orang Tua', notify: true },
       { id: 'f2', name: 'Nenek Sri', email: 'sri@email.com', role: 'Pengasuh', notify: true },
     ],
     events: seedEvents(),
+    careLog: seedCare(),
     sleepLog: seedSleep(),
+    growthLog: seedGrowth(),
+    milestones: { smile: true, headUp: true, rollOver: true, babble: false, sit: false, crawl: false },
     stats: { sleptToday: 0 },
     readUpTo: Date.now() - 2 * 3600000,
   });
@@ -73,6 +78,26 @@ const Store = (() => {
       out.push({ date: isoDaysAgo(i), hours: hrs[6 - i], wakes: [3, 2, 4, 1, 2, 1][6 - i] || 2 });
     }
     return out;
+  }
+
+  function seedCare() {
+    const now = Date.now();
+    return [
+      { id: 'c1', type: 'milk', label: 'ASI / Susu', detail: '110 ml · Habis', ts: now - 1.4 * 3600000, by: 'Bunda' },
+      { id: 'c2', type: 'diaper', label: 'Ganti Popok', detail: 'Pipis (basah)', ts: now - 2.8 * 3600000, by: 'Budi (Ayah)' },
+      { id: 'c3', type: 'temp', label: 'Suhu Tubuh', detail: '36.7 °C · Normal', ts: now - 4.5 * 3600000, by: 'Bunda' },
+      { id: 'c4', type: 'milk', label: 'ASI / Susu', detail: '95 ml · Kiri & Kanan', ts: now - 5.2 * 3600000, by: 'Bunda' },
+    ];
+  }
+
+  function seedGrowth() {
+    return [
+      { id: 'g1', date: isoDaysAgo(120), month: 0, weight: 3.2, height: 49.5, head: 34.5, note: 'Lahir sehat' },
+      { id: 'g2', date: isoDaysAgo(90), month: 1, weight: 4.1, height: 53.2, head: 36.8, note: 'Imunisasi BCG' },
+      { id: 'g3', date: isoDaysAgo(60), month: 2, weight: 5.0, height: 56.8, head: 38.4, note: 'Tumbuh optimal' },
+      { id: 'g4', date: isoDaysAgo(30), month: 3, weight: 5.8, height: 60.1, head: 39.8, note: 'Mulai tengkurap' },
+      { id: 'g5', date: isoDaysAgo(2), month: 4, weight: 6.4, height: 62.4, head: 40.9, note: 'Posyandu bulan ini' },
+    ];
   }
 
   function isObj(v) { return v && typeof v === 'object' && !Array.isArray(v); }

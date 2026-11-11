@@ -15,9 +15,109 @@ const Camera = (() => {
     camName: 'CAM-01 · Kamar Bayi',
     ai: { label: 'BAYI 97%', status: 'TIDUR', alert: false },
     lullaby: false,
+    mode: 'sim',          // 'sim' | 'webcam' | 'remote'
+    facing: 'environment',
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    roi: null,
   };
   let lastFrame = 0, breathPhase = 0, lastT = 0;
   const targets = new Set();
+
+  /* ---------------- Webcam / Kamera Asli & Deteksi Gerakan ---------------- */
+  let videoEl = null, mediaStream = null, audioStream = null, analyser = null, audioData = null;
+  const motionCv = document.createElement('canvas');
+  motionCv.width = 80; motionCv.height = 50;
+  const motionCtx = motionCv.getContext('2d', { willReadFrequently: true });
+  let prevPixels = null, liveMotionVal = 0, liveDbVal = 32;
+  let remoteImg = null;
+
+  async function startWebcam(facing = view.facing) {
+    stopWebcam();
+    try {
+      view.facing = facing;
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facing, width: { ideal: 640 }, height: { ideal: 400 } },
+        audio: true,
+      });
+      videoEl = document.createElement('video');
+      videoEl.srcObject = mediaStream;
+      videoEl.muted = true;
+      videoEl.playsInline = true;
+      await videoEl.play();
+
+      // Setup mikrofon untuk deteksi dB (tangisan)
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC && mediaStream.getAudioTracks().length) {
+        const ac = new AC();
+        const src = ac.createMediaStreamSource(mediaStream);
+        analyser = ac.createAnalyser();
+        analyser.fftSize = 256;
+        src.connect(analyser);
+        audioData = new Uint8Array(analyser.frequencyBinCount);
+      }
+      prevPixels = null;
+      view.mode = 'webcam';
+      return true;
+    } catch (err) {
+      console.warn('Gagal membuka kamera/mikrofon:', err);
+      view.mode = 'sim';
+      return false;
+    }
+  }
+
+  function stopWebcam() {
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(t => t.stop());
+      mediaStream = null;
+    }
+    if (videoEl) { videoEl.srcObject = null; videoEl = null; }
+    analyser = null; audioData = null; prevPixels = null;
+    if (view.mode === 'webcam') view.mode = 'sim';
+  }
+
+  async function flipWebcam() {
+    const next = view.facing === 'user' ? 'environment' : 'user';
+    return startWebcam(next);
+  }
+
+  function setRemoteFrame(dataUrl) {
+    if (!remoteImg) remoteImg = new Image();
+    remoteImg.src = dataUrl;
+    view.mode = 'remote';
+  }
+
+  function sampleSensors() {
+    if (view.mode !== 'webcam' || !videoEl || videoEl.readyState < 2) return null;
+    // Hitung gerakan dari selisih piksel antar frame
+    motionCtx.drawImage(videoEl, 0, 0, 80, 50);
+    const cur = motionCtx.getImageData(0, 0, 80, 50).data;
+    if (prevPixels) {
+      let diff = 0;
+      for (let i = 0; i < cur.length; i += 4) {
+        const d = Math.abs(cur[i] - prevPixels[i]) + Math.abs(cur[i + 1] - prevPixels[i + 1]) + Math.abs(cur[i + 2] - prevPixels[i + 2]);
+        if (d > 45) diff++;
+      }
+      const pct = Math.min(100, (diff / (80 * 50)) * 260);
+      liveMotionVal = liveMotionVal * 0.65 + pct * 0.35;
+    }
+    prevPixels = new Uint8ClampedArray(cur);
+
+    // Hitung dB suara dari mikrofon
+    if (analyser && audioData) {
+      analyser.getByteTimeDomainData(audioData);
+      let sum = 0;
+      for (let i = 0; i < audioData.length; i++) {
+        const v = (audioData[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / audioData.length);
+      const db = Math.min(96, Math.max(28, 30 + rms * 195));
+      liveDbVal = liveDbVal * 0.6 + db * 0.4;
+    }
+    return { db: liveDbVal, motion: liveMotionVal };
+  }
 
   function rr(x, y, w, h, r) {
     c.beginPath();
@@ -226,6 +326,22 @@ const Camera = (() => {
       c.fillStyle = 'rgba(0,0,0,.45)'; rr(view.night ? 92 : 10, H - 36, 104, 26, 6); c.fill();
       c.fillStyle = '#fff'; c.fillText('♪ LULLABY', (view.night ? 100 : 18), H - 23);
     }
+    if (view.zoom > 1) {
+      const zt = `${view.zoom}x ZOOM`;
+      const zw = c.measureText(zt).width + 16;
+      c.fillStyle = 'rgba(91,108,249,.85)'; rr(W - zw - 10, H - 36, zw, 26, 6); c.fill();
+      c.fillStyle = '#fff'; c.fillText(zt, W - zw - 2, H - 23);
+    }
+    if (view.roi && view.roi.on) {
+      const rx = view.roi.x * W, ry = view.roi.y * H, rw = view.roi.w * W, rh = view.roi.h * H;
+      c.save();
+      c.setLineDash([6, 6]); c.strokeStyle = 'rgba(116,132,255,.7)'; c.lineWidth = 2;
+      c.strokeRect(rx, ry, rw, rh);
+      c.font = '700 11px "JetBrains Mono", ui-monospace, monospace';
+      c.fillStyle = 'rgba(116,132,255,.85)'; rr(rx + 6, ry + 6, 84, 18, 4); c.fill();
+      c.fillStyle = '#fff'; c.fillText('ZONA AMAN', rx + 12, ry + 15.5);
+      c.restore();
+    }
 
     if (!view.overlay || !pos) return;
     const col = view.ai.alert ? '#ff4d5e' : '#3ff0a6';
@@ -274,8 +390,31 @@ const Camera = (() => {
     const dt = Math.min(.1, t - lastT); lastT = t;
     breathPhase += dt * 2 * Math.PI * (view.rpm / 60);
     if (!view.online) { drawOffline(); return; }
-    drawRoom();
-    const pos = drawBaby(t, view.baby);
+    let pos = { cx: 310, cy: 200, rot: 0, hx: 0, hy: -25 };
+    c.save();
+    if (view.zoom > 1) {
+      const z = view.zoom;
+      const px = Math.max(-1, Math.min(1, view.panX || 0)) * (W * (z - 1) / (2 * z));
+      const py = Math.max(-1, Math.min(1, view.panY || 0)) * (H * (z - 1) / (2 * z));
+      c.translate(W / 2, H / 2);
+      c.scale(z, z);
+      c.translate(-W / 2 - px, -H / 2 - py);
+    }
+    if (view.mode === 'webcam' && videoEl && videoEl.readyState >= 2) {
+      const vw = videoEl.videoWidth || W, vh = videoEl.videoHeight || H;
+      const scale = Math.max(W / vw, H / vh);
+      const dw = vw * scale, dh = vh * scale;
+      c.save();
+      if (view.facing === 'user') { c.translate(W, 0); c.scale(-1, 1); }
+      c.drawImage(videoEl, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      c.restore();
+    } else if (view.mode === 'remote' && remoteImg && remoteImg.complete && remoteImg.naturalWidth) {
+      c.drawImage(remoteImg, 0, 0, W, H);
+    } else {
+      drawRoom();
+      pos = drawBaby(t, view.baby);
+    }
+    c.restore();
     if (view.night) {
       // efek inframerah: hitam-putih + sedikit terang
       c.globalCompositeOperation = 'saturation'; c.fillStyle = '#808080'; c.fillRect(0, 0, W, H);
@@ -286,7 +425,7 @@ const Camera = (() => {
       vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)');
       c.fillStyle = vg; c.fillRect(0, 0, W, H);
       noise(700);
-    } else noise();
+    } else if (view.mode === 'sim') noise();
     drawHud(pos);
   }
 
@@ -315,5 +454,5 @@ const Camera = (() => {
   }
   const fullSnapshot = () => { draw(performance.now() / 1000); return off.toDataURL('image/jpeg', .92); };
 
-  return { view, scan, snapshot, fullSnapshot, W, H };
+  return { view, scan, snapshot, fullSnapshot, startWebcam, stopWebcam, flipWebcam, setRemoteFrame, sampleSensors, get canvas() { return off; }, W, H };
 })();

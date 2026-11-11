@@ -29,7 +29,26 @@ Di HP (satu Wi-Fi): buka http://IP-LAPTOP:8765 — panel simulasi dibuka lewat t
 - **Mode gelap otomatis** (18.00–06.00) atau manual di Pengaturan → Tampilan
 - Perangkat & Keluarga berbentuk kartu: volume speaker, tes, hapus, undang anggota, atur notifikasi per anggota
 - Mode internet putus → gateway lokal tetap membunyikan alarm
-- Panel Simulasi (pengganti hardware): picu tangisan, tengkurap, muntah, napas, kamera/internet mati, demo otomatis
+- **Kamera & Mikrofon Asli (WebRTC / Web Audio API)** — beralih dari kamera simulasi ke kamera & mikrofon HP/laptop asli untuk mendeteksi suara tangisan (dB) dan gerakan piksel secara *real-time*
+- **Digital Zoom (1x–3x), Pan, Zona Aman Boks (AI Geofence), & Picture-in-Picture (PiP)** — kontrol kamera canggih dan jendela video mengambang
+- **Smart Auto-Soothe AI & 6 Suara Penenang** — Twinkle, Brahms, Nina Bobo, White Noise, Hujan Lembut, dan Detak Jantung Ibu (otomatis menyala saat bayi menangis)
+- **Rekam Video Live (.webm)** — rekam dan unduh video langsung dari layar Live
+- **Jurnal Perawatan & Kurva Tumbuh Kembang (KMS/WHO)** — catat ASI/susu, popok, suhu tubuh, berat/tinggi badan, lingkar kepala, dan checklist milestone perkembangan
+- **Kunci Aplikasi PIN 4 Digit & Biometrik** — proteksi layar saat aplikasi dibuka (Keamanan & Privasi)
+- **Ekspor Data CSV & Unggah Foto Bayi** — unduh riwayat kejadian + perawatan ke file CSV dan pasang foto profil si kecil
+- **Sinkronisasi 2 Perangkat & Backend FastAPI** — sinkronisasi *stream* + alarm antar tab/perangkat dan dukungan penuh endpoint PRD (`/health`, `/ingest/frame`, `/ingest/heartbeat`, `/v1/notify`, `/v1/test-alarm`, `/v1/status`)
+- Panel Simulasi (pengganti hardware): picu tangisan, tengkurap, muntah, napas, kamera/internet mati, demo otomatis, atau aktifkan kamera asli
+
+## Menjalankan Backend FastAPI (Sesuai PRD)
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+Cek status di `http://127.0.0.1:8000/health` atau hubungkan langsung dari aplikasi melalui menu **Perangkat → Sinkronisasi 2 Tab / Perangkat**.
 
 ## Struktur
 ```

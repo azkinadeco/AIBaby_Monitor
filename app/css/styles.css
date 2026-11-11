@@ -1176,3 +1176,38 @@ html.standalone .screen { padding-top: max(env(safe-area-inset-top), 10px); }
 .install-t small .ic { color: var(--pri); }
 .install-go { background: var(--pri); color: #fff; font-weight: 800; font-size: 12.5px; padding: 8px 12px; border-radius: 11px; }
 .install-x { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; color: var(--muted); background: var(--track); flex-shrink: 0; }
+
+/* =========================================================
+   v1.8 — PIN Lock, Foto Bayi, Kamera Asli & Jurnal Perawatan
+   ========================================================= */
+.baby-photo { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
+.who-av { overflow: hidden; cursor: pointer; }
+.ok-pill { background: rgba(22, 168, 112, .9) !important; }
+
+.pin-scr { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; gap: 24px; text-align: center; }
+.pin-top { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.pin-top .ic { color: var(--pri); background: var(--pri-l); width: 68px; height: 68px; padding: 16px; border-radius: 22px; margin-bottom: 4px; }
+.pin-dots { display: flex; gap: 16px; margin: 4px 0; }
+.pin-dots i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--pri); background: transparent; transition: all .15s; }
+.pin-dots i.on { background: var(--pri); transform: scale(1.1); }
+.pin-dots.err { animation: shake .35s; }
+.pin-dots.err i { border-color: var(--bad); background: var(--bad); }
+.pin-pad { display: grid; grid-template-columns: repeat(3, 74px); gap: 14px; justify-content: center; }
+.pin-k { width: 74px; height: 74px; border-radius: 50%; background: var(--card); border: 1px solid var(--line); box-shadow: var(--sh); font-size: 24px; font-weight: 800; display: grid; place-items: center; transition: transform .1s, background .15s; }
+.pin-k:active { transform: scale(.92); background: var(--pri-l); color: var(--pri); }
+.pin-k.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--pri); }
+
+.btn-pill { cursor: pointer; border: 1px solid rgba(255,255,255,.2); transition: background .2s; }
+.btn-pill:active { transform: scale(.94); background: var(--pri); }
+.live-pip { position: absolute; right: 50px; bottom: 10px; width: 34px; height: 34px; border-radius: 10px; background: rgba(0, 0, 0, .55); color: #fff; display: grid; place-items: center; }
+.seg-lg span { padding: 9px 2px; font-size: 12.5px; }
+
+.copilot { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: linear-gradient(135deg, #F4F5FF, #FFF); border: 1px solid #DCE0FF; cursor: pointer; }
+.copilot.warn { background: linear-gradient(135deg, #FFF6E8, #FFF); border-color: #F7D9A8; }
+.cp-ic { width: 38px; height: 38px; border-radius: 12px; background: var(--pri); color: #fff; display: grid; place-items: center; flex-shrink: 0; }
+.copilot.warn .cp-ic { background: var(--warn); }
+.cp-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cp-body b { font-size: 13px; color: var(--pri); }
+.copilot.warn .cp-body b { color: var(--warn); }
+.cp-body small { font-size: 12px; color: var(--text); line-height: 1.35; }
+#device[data-theme=dark] .copilot { background: var(--card); border-color: var(--line); }

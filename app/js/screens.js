@@ -72,7 +72,8 @@ function disclaimer() {
   return `<p class="fine center disc">${ic('info', 12)} Alat bantu pemantauan — bukan pengganti pengawasan orang tua dan bukan alat medis.</p>`;
 }
 
-/* ---------------- SPLASH ---------------- */
+/* ---------------- SPLASH & PIN LOCK ---------------- */
+let pinUnlocked = false;
 Screens.splash = {
   render: () => `<div class="splash">
     <div class="splash-logo">${logo(88, '#fff')}</div>
@@ -82,7 +83,49 @@ Screens.splash = {
   </div>`,
   mount() { setTimeout(() => { if (App.route.name === 'splash') App.go(nextEntry(), {}, { reset: true }); }, 1100); },
 };
-function nextEntry() { return 'home'; }
+function nextEntry() {
+  if (Store.s.settings.pin && !pinUnlocked) return 'pinLock';
+  return 'home';
+}
+
+let pinBuf = '';
+Screens.pinLock = {
+  render: () => `<div class="pin-scr">
+    <div class="pin-top">${ic('lock', 36)}<h2>Kunci Aplikasi</h2><p class="muted">Masukkan 4 digit PIN keamanan Anda</p></div>
+    <div class="pin-dots" id="pin-dots">${[0, 1, 2, 3].map(i => `<i class="${i < pinBuf.length ? 'on' : ''}"></i>`).join('')}</div>
+    <div class="pin-pad">
+      ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button class="pin-k" data-act="pinKey" data-k="${n}">${n}</button>`).join('')}
+      <button class="pin-k ghost" data-act="pinBio" aria-label="Biometrik">${ic('fingerprint', 26)}</button>
+      <button class="pin-k" data-act="pinKey" data-k="0">0</button>
+      <button class="pin-k ghost" data-act="pinDel" aria-label="Hapus">${ic('chevL', 24)}</button>
+    </div>
+    <p class="fine center">PIN standar demo: <b>${esc(Store.s.settings.pinCode || '1234')}</b></p>
+  </div>`,
+};
+Actions.pinKey = el => {
+  if (pinBuf.length >= 4) return;
+  pinBuf += el.dataset.k;
+  $$('#pin-dots i').forEach((d, i) => d.classList.toggle('on', i < pinBuf.length));
+  if (pinBuf.length === 4) {
+    const target = Store.s.settings.pinCode || '1234';
+    if (pinBuf === target) {
+      pinBuf = ''; pinUnlocked = true;
+      Sound.beep(.4);
+      App.go('home', {}, { reset: true });
+    } else {
+      $('#pin-dots')?.classList.add('err');
+      if (navigator.vibrate) try { navigator.vibrate([120, 60, 120]); } catch (e) { /* */ }
+      toast('PIN salah, coba lagi', { icon: 'alert', tone: 'bad' });
+      setTimeout(() => { pinBuf = ''; App.refresh(); }, 450);
+    }
+  }
+};
+Actions.pinDel = () => { pinBuf = pinBuf.slice(0, -1); $$('#pin-dots i').forEach((d, i) => d.classList.toggle('on', i < pinBuf.length)); };
+Actions.pinBio = () => {
+  pinBuf = ''; pinUnlocked = true;
+  toast('Terverifikasi dengan Face ID / Biometrik', { icon: 'shield', tone: 'ok' });
+  App.go('home', {}, { reset: true });
+};
 
 /* ---------------- ONBOARDING ---------------- */
 const OB = [
@@ -409,10 +452,14 @@ Actions.testSpeaker = async el => {
   if (el) el.disabled = false;
 };
 
+function babyAvatarHtml(cls = '') {
+  const p = Store.s.baby.photo;
+  return p ? `<img src="${p}" alt="Foto bayi" class="baby-photo">` : ic('baby', cls === 'sm' ? 26 : cls === 'who' ? 22 : 44);
+}
 function babyForm(setup) {
   const b = Store.s.baby;
   return `${setup ? '<div class="page-hero"><span class="step-pill">4 / 4</span><h1>Profil si kecil</h1><p>Agar AI dan pesan alarm lebih personal.</p></div>' : ''}
-    <div class="baby-av">${ic('baby', 44)}<button class="mini-btn" data-act="noop">${ic('camera', 14)}</button></div>
+    <div class="baby-av" id="baby-av-box">${babyAvatarHtml()}<button class="mini-btn" type="button" data-act="pickBabyPhoto" aria-label="Ubah foto bayi">${ic('camera', 14)}</button><input type="file" id="baby-photo-in" accept="image/*" class="hidden"></div>
     <form class="form" id="baby-form">
       <label class="field"><span>Nama panggilan bayi</span><input name="name" value="${esc(b.name)}" required maxlength="24"></label>
       <label class="field"><span>Tanggal lahir</span><input name="birth" type="date" value="${b.birth}" max="${new Date().toISOString().slice(0, 10)}" required></label>
@@ -423,6 +470,29 @@ function babyForm(setup) {
     </form>`;
 }
 function bindBabyForm(setup) {
+  const inp = $('#baby-photo-in');
+  if (inp) {
+    inp.onchange = e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const r = new FileReader();
+      r.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const cv = document.createElement('canvas');
+          cv.width = 160; cv.height = 160;
+          const s = Math.min(img.width, img.height);
+          cv.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 160, 160);
+          Store.s.baby.photo = cv.toDataURL('image/jpeg', .82);
+          Store.save();
+          App.refresh();
+          toast('Foto si kecil diperbarui', { icon: 'camera', tone: 'ok' });
+        };
+        img.src = r.result;
+      };
+      r.readAsDataURL(file);
+    };
+  }
   $('#baby-form').onsubmit = e => {
     e.preventDefault(); const f = new FormData(e.target);
     Object.assign(Store.s.baby, { name: String(f.get('name')).trim(), birth: f.get('birth'), gender: f.get('gender'), note: f.get('note') });
@@ -436,7 +506,7 @@ Actions.finishSetup = () => {
   App.go('home', {}, { reset: true });
   setTimeout(() => toast('Pemantauan AI aktif 24/7', { icon: 'shield', tone: 'ok' }), 400);
 };
-Actions.noop = () => toast('Fitur foto profil tersedia di versi aplikasi', { icon: 'info' });
+Actions.pickBabyPhoto = () => $('#baby-photo-in')?.click();
 
 /* ---------------- BERANDA ---------------- */
 function todayEvents() { const t = new Date().toDateString(); return Store.s.events.filter(e => new Date(e.ts).toDateString() === t); }
@@ -455,6 +525,39 @@ function sleepTimeline() {
   return `<div class="tline"><div class="tl-track">${segs}${dots}<span class="tl-now" style="left:${cur / 24 * 100}%"></span></div>
     <div class="tl-lbl"><small>00</small><small>06</small><small>12</small><small>18</small><small>24</small></div></div>`;
 }
+function aiCopilotCard(score, wakes, alerts) {
+  const s = Store.s, b = s.baby.name;
+  const lastMilk = (s.careLog || []).find(c => c.type === 'milk');
+  const milkAgoMin = lastMilk ? Math.round((Date.now() - lastMilk.ts) / 60000) : 120;
+  const nextMilkIn = Math.max(15, 180 - milkAgoMin);
+  const hot = Engine.live.roomTemp >= 28;
+  const msg = hot
+    ? `Suhu kamar <b>${Engine.live.roomTemp}°C</b> agak hangat. Idealnya 24–26°C agar ${esc(b)} tidak gelisah.`
+    : alerts > 2
+      ? `Tercatat ${alerts} peringatan hari ini. Pastikan selimut tidak menutupi dada & wajah ${esc(b)}.`
+      : `Pola tidur ${esc(b)} stabil (skor ${score}). Estimasi menyusu berikutnya dalam <b>±${fmtDur(nextMilkIn * 60)}</b>.`;
+  return `<div class="card copilot ${hot ? 'warn' : ''}" data-act="copilotSheet" role="button">
+    <span class="cp-ic">${ic('sparkles', 20)}</span>
+    <div class="cp-body"><b>Ringkasan AI Copilot</b><small>${msg}</small></div>
+    ${ic('chevR', 18)}
+  </div>`;
+}
+Actions.copilotSheet = () => {
+  const s = Store.s, b = esc(s.baby.name);
+  const lastMilk = (s.careLog || []).find(c => c.type === 'milk');
+  const lastDiaper = (s.careLog || []).find(c => c.type === 'diaper');
+  sheet(`<h3 class="sheet-title">${ic('sparkles', 20)} Analisis AI Copilot · ${b}</h3>
+    <div class="card list">
+      <div class="li">${ic('moon', 20)}<span><b>Prediksi Jendela Tidur Berikutnya</b><small>Berdasarkan usia ${babyAge(s.baby.birth)}, waktu bangun optimal 90–120 menit sebelum tidur siang.</small></span></div>
+      <div class="li">${ic('bottle', 20)}<span><b>Jadwal Menyusu</b><small>Terakhir: ${lastMilk ? fmtAgo(lastMilk.ts) + ' (' + esc(lastMilk.detail) + ')' : 'Belum tercatat'} · Disarankan tiap 2,5–3 jam.</small></span></div>
+      <div class="li">${ic('droplet', 20)}<span><b>Kondisi Popok</b><small>Terakhir diganti: ${lastDiaper ? fmtAgo(lastDiaper.ts) : 'Belum tercatat'}.</small></span></div>
+      <div class="li">${ic('thermo', 20)}<span><b>Kenyamanan Kamar (${Engine.live.roomTemp}°C · ${Engine.live.roomHum}%)</b><small>${Engine.live.roomTemp >= 28 ? 'Suhu di atas 28°C — disarankan menyalakan AC/kipas lembut.' : 'Suhu dan kelembapan kamar berada di rentang nyaman (24–26°C).'}</small></span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-soft" data-act="careSheet">${ic('plus', 16)} Catat Rawat</button>
+      <button class="btn btn-pri" data-act="lullaby">${ic('music', 16)} Putar Penenang</button>
+    </div>`);
+};
 Screens.home = {
   render() {
     const s = Store.s, guest = isGuest();
@@ -471,10 +574,11 @@ Screens.home = {
     return `
     <header class="top">
       <div class="who">
-        <span class="who-av">${ic('baby', 22)}</span>
+        <span class="who-av" data-go="baby" role="button">${babyAvatarHtml('who')}</span>
         <div><div class="hello">${esc(s.baby.name)}</div><div class="hi-k">${babyAge(s.baby.birth)}</div></div>
       </div>
       <div class="top-act">
+        <button class="icon-btn soft" data-act="careSheet" aria-label="Catat perawatan" title="Jurnal Perawatan">${ic('heart', 19)}</button>
         <button class="icon-btn soft" data-go="history" aria-label="Aktivitas">${ic('bell', 20)}<i class="dot-badge hidden" data-badge></i></button>
         ${guest ? `<button class="login-pill" data-go="auth">Masuk</button>` : `<button class="avatar" data-go="profile" aria-label="Profil">${initials(s.user?.name)}</button>`}
       </div>
@@ -484,7 +588,11 @@ Screens.home = {
       ${banner}
       <div class="hero" data-go="live" data-reset="1" role="button" aria-label="Buka live view">
         <canvas class="cam"></canvas>
-        <div class="hero-top"><span class="live-pill"><i></i>LIVE</span></div>
+        <div class="hero-top">
+          <span class="live-pill"><i></i>LIVE</span>
+          <span class="pill">${ic('thermo', 11)} <b data-b="roomTemp">${Engine.live.roomTemp}</b>°C · <span data-b="roomHum">${Engine.live.roomHum}</span>%</span>
+          ${Camera.view.mode === 'webcam' ? `<span class="pill ok-pill">${ic('camera', 11)} Kamera Asli</span>` : ''}
+        </div>
         <div class="hero-bot" data-tone="ok">
           <span class="st-ic" data-b-icon="status" data-size="18"></span>
           <div><b data-b="status">-</b></div>
@@ -521,6 +629,8 @@ Screens.home = {
         </div>
         ${sleepTimeline()}
       </div>
+
+      ${aiCopilotCard(score, wakes, alerts)}
 
       <div class="sec-h"><h3>Terbaru</h3><a data-go="history">Semua</a></div>
       <div class="hscroll">${evs.map(e => {
@@ -574,30 +684,40 @@ function bindTalk(root) {
 Actions.phrase = el => { Sound.speak(el.textContent, .8); toast('Diputar di speaker kamera: “' + el.textContent + '”', { icon: 'volume' }); };
 
 /* ---------------- LIVE VIEW ---------------- */
-let recTimer = null, recStart = 0;
+let recTimer = null, recStart = 0, mediaRec = null, recChunks = [];
 Screens.live = {
   dark: true,
   render() {
     const s = Store.s, cam = s.cameras[0];
     const night = Engine.isNight();
-    const lc = (act, icon, label, on = false) => `<button class="lc ${on ? 'on' : ''}" data-act="${act}" aria-label="${label}">${ic(icon, 22)}<span>${label}</span></button>`;
+    const isWebcam = Camera.view.mode === 'webcam';
+    const isRec = !!recTimer;
+    const lc = (act, icon, label, on = false, cls = '') => `<button class="lc ${on ? 'on' : ''} ${cls}" data-act="${act}" aria-label="${label}">${ic(icon, 22)}<span>${label}</span></button>`;
     return `
     <header class="bar dark">
-      <span class="bar-sp"></span>
-      <div class="bar-t"><h1>${esc(cam?.name || 'Kamera')}</h1></div>
-      <span class="bar-sp"></span>
+      <button class="icon-btn" data-act="camSourceSheet" aria-label="Sumber kamera" title="Sumber kamera">${ic(isWebcam ? 'camera' : 'cctv', 20)}</button>
+      <div class="bar-t"><h1>${esc(cam?.name || 'Kamera')}</h1><small>${isWebcam ? 'Kamera & Mikrofon Asli' : 'Kamera Simulasi AI'}</small></div>
+      ${isWebcam ? `<button class="icon-btn" data-act="flipCam" aria-label="Balik kamera">${ic('flip', 20)}</button>` : `<button class="icon-btn" data-act="camSourceSheet" aria-label="Ganti kamera">${ic('radio', 20)}</button>`}
     </header>
     <div class="live-wrap" id="live-wrap">
       <canvas class="cam"></canvas>
-      <div class="live-top"><span class="live-pill"><i></i>LIVE</span><span class="pill">${ic('activity', 12)} <span data-b="latency">-</span>s</span></div>
+      <div class="live-top">
+        <span class="live-pill"><i></i>LIVE</span>
+        <span class="pill">${ic('activity', 12)} <span data-b="latency">-</span>s</span>
+        <button class="pill btn-pill" data-act="zoomCycle" title="Digital Zoom">${ic('zoomIn', 12)} <b id="zoom-lbl">${Camera.view.zoom || 1}x</b></button>
+        <button class="pill btn-pill" data-act="roiSheet" title="Zona Aman Boks">${ic('shield', 12)} Zona</button>
+      </div>
+      ${isRec ? `<div class="live-rec" id="live-rec"><i></i><span id="rec-time">00:00</span></div>` : ''}
+      <button class="live-pip" data-act="pipToggle" aria-label="Picture in Picture" title="Layar Mengambang (PiP)">${ic('pip', 17)}</button>
       <button class="live-fs" data-act="fullscreen" aria-label="Layar penuh">${ic('maximize', 18)}</button>
       <div class="live-status" data-tone="ok"><span data-b-icon="status" data-size="16"></span><b data-b="status">-</b></div>
     </div>
-    <div class="live-ctrl five">
+    <div class="live-ctrl">
       ${lc('talkSheet', 'mic', 'Bicara')}
       ${lc('lullaby', 'music', 'Lagu', Sound.lullabyOn())}
       ${lc('liveAudio', s.settings.liveAudio ? 'volume' : 'volumeX', 'Dengar', s.settings.liveAudio)}
       ${lc('snapshot', 'camera', 'Foto')}
+      ${lc('toggleRec', 'record', isRec ? 'Stop' : 'Rekam', false, isRec ? 'rec' : '')}
       ${lc('nightToggle', 'moon', 'Malam', night)}
     </div>
     <div class="ai-panel">
@@ -611,7 +731,23 @@ Screens.live = {
       </div>
     </div>`;
   },
-  mount() { if (Store.s.settings.liveAudio) Sound.roomAudio(true); },
+  mount() {
+    if (Store.s.settings.liveAudio) Sound.roomAudio(true);
+    const w = $('#live-wrap');
+    if (w) {
+      let drag = false, sx = 0, sy = 0, px0 = 0, py0 = 0;
+      w.onpointerdown = e => {
+        if ((Camera.view.zoom || 1) <= 1 || e.target.closest('button')) return;
+        drag = true; sx = e.clientX; sy = e.clientY; px0 = Camera.view.panX || 0; py0 = Camera.view.panY || 0;
+      };
+      w.onpointermove = e => {
+        if (!drag) return;
+        Camera.view.panX = Math.max(-1, Math.min(1, px0 - (e.clientX - sx) / 120));
+        Camera.view.panY = Math.max(-1, Math.min(1, py0 - (e.clientY - sy) / 80));
+      };
+      w.onpointerup = w.onpointercancel = w.onpointerleave = () => { drag = false; };
+    }
+  },
 };
 const _upd = updateBindings;
 updateBindings = function () {
@@ -648,6 +784,150 @@ Actions.nightToggle = () => {
   App.refresh();
 };
 Actions.fullscreen = () => { const w = $('#live-wrap'); if (w) w.classList.toggle('fs'); };
+Actions.zoomCycle = () => {
+  const zs = [1, 1.5, 2, 3];
+  const cur = Camera.view.zoom || 1;
+  const next = zs[(zs.indexOf(cur) + 1) % zs.length];
+  Camera.view.zoom = next;
+  if (next === 1) { Camera.view.panX = 0; Camera.view.panY = 0; }
+  const lb = $('#zoom-lbl'); if (lb) lb.textContent = `${next}x`;
+  toast(next === 1 ? 'Zoom normal (1x)' : `Digital Zoom ${next}x (geser layar untuk arahkan)`, { icon: 'zoomIn' });
+};
+let pipVideo = null;
+Actions.pipToggle = async () => {
+  try {
+    if (document.pictureInPictureElement) {
+      await document.exitPictureInPicture();
+      return;
+    }
+    if (!pipVideo) {
+      pipVideo = document.createElement('video');
+      pipVideo.muted = true;
+      pipVideo.playsInline = true;
+    }
+    const stream = Camera.canvas.captureStream(25);
+    pipVideo.srcObject = stream;
+    await pipVideo.play();
+    if (pipVideo.requestPictureInPicture) {
+      await pipVideo.requestPictureInPicture();
+      toast('Mode Layar Mengambang (PiP) aktif', { icon: 'pip', tone: 'ok' });
+    } else {
+      toast('Browser ini belum mendukung Picture-in-Picture', { icon: 'info', tone: 'warn' });
+    }
+  } catch (e) {
+    toast('Gagal membuka Picture-in-Picture', { icon: 'alert', tone: 'warn' });
+  }
+};
+Actions.roiSheet = () => {
+  const r = Store.s.settings.roi || { on: true, x: 0.10, y: 0.12, w: 0.80, h: 0.76 };
+  sheet(`<h3 class="sheet-title">${ic('shield', 20)} Zona Aman Boks (AI Geofence)</h3>
+    <p class="muted small">Atur batas area boks bayi pada kamera untuk memfokuskan deteksi posisi & gerakan.</p>
+    <div class="card set-row" style="padding:10px 14px;align-items:center">
+      <div class="set-main"><b>Tampilkan Garis Zona Aman</b><small>Garis batas biru pada layar kamera</small></div>
+      ${toggle('settings.roi.on', r.on)}
+    </div>
+    <div class="opt-grid">
+      <button class="opt ${r.w > 0.75 ? 'on' : ''}" data-act="setRoiPreset" data-p="full">${ic('maximize', 20)}<span>Boks Penuh</span></button>
+      <button class="opt ${r.w <= 0.75 && r.w > 0.55 ? 'on' : ''}" data-act="setRoiPreset" data-p="mid">${ic('shield', 20)}<span>Tengah Kasur</span></button>
+      <button class="opt ${r.w <= 0.55 ? 'on' : ''}" data-act="setRoiPreset" data-p="tight">${ic('baby', 20)}<span>Area Bayi</span></button>
+    </div>`);
+};
+Actions.setRoiPreset = el => {
+  const p = el.dataset.p;
+  const presets = {
+    full: { on: true, x: 0.08, y: 0.10, w: 0.84, h: 0.80 },
+    mid: { on: true, x: 0.16, y: 0.16, w: 0.68, h: 0.68 },
+    tight: { on: true, x: 0.24, y: 0.22, w: 0.52, h: 0.56 },
+  };
+  Store.s.settings.roi = presets[p] || presets.full;
+  Camera.view.roi = Store.s.settings.roi;
+  Store.save(); closeSheet();
+  toast('Zona Aman Boks diperbarui', { icon: 'shield', tone: 'ok' });
+  App.refresh();
+};
+Actions.toggleRec = () => {
+  if (recTimer) {
+    clearInterval(recTimer); recTimer = null;
+    if (mediaRec && mediaRec.state !== 'inactive') {
+      mediaRec.stop();
+    } else {
+      toast('Rekaman video disimpan', { icon: 'video', tone: 'ok' });
+    }
+    App.refresh();
+    return;
+  }
+  recStart = Date.now();
+  recChunks = [];
+  try {
+    const stream = Camera.canvas.captureStream ? Camera.canvas.captureStream(25) : null;
+    if (stream && 'MediaRecorder' in window) {
+      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+      mediaRec = new MediaRecorder(stream, { mimeType: mime });
+      mediaRec.ondataavailable = e => { if (e.data && e.data.size > 0) recChunks.push(e.data); };
+      mediaRec.onstop = () => {
+        const blob = new Blob(recChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `rekaman-bayi-${Date.now()}.webm`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        toast('Video rekaman (.webm) berhasil diunduh', { icon: 'download', tone: 'ok' });
+      };
+      mediaRec.start(200);
+    }
+  } catch (e) { mediaRec = null; }
+  recTimer = setInterval(() => {
+    const s = Math.floor((Date.now() - recStart) / 1000);
+    const el = $('#rec-time');
+    if (el) el.textContent = `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
+  }, 500);
+  toast('Merekam video live… ketuk Stop untuk mengunduh', { icon: 'record', tone: 'bad' });
+  App.refresh();
+};
+Actions.camSourceSheet = () => {
+  const isWeb = Camera.view.mode === 'webcam';
+  sheet(`<h3 class="sheet-title">${ic('cctv', 20)} Sumber Kamera & Mode Perangkat</h3>
+    <div class="list-cards">
+      <button class="card pick ${!isWeb ? 'accent' : ''}" data-act="setCamMode" data-m="sim">
+        ${ic('sparkles', 24)}
+        <span><b>Kamera Simulasi AI (Bawaan)</b><small>Animasi interaktif boks bayi + Panel Simulasi</small></span>
+        ${!isWeb ? ic('checkCircle', 20) : ''}
+      </button>
+      <button class="card pick ${isWeb ? 'accent' : ''}" data-act="setCamMode" data-m="webcam">
+        ${ic('camera', 24)}
+        <span><b>Kamera & Mikrofon Perangkat Asli</b><small>Gunakan kamera HP/laptop ini + deteksi gerakan & suara nyata</small></span>
+        ${isWeb ? ic('checkCircle', 20) : ''}
+      </button>
+    </div>
+    ${isWeb ? `<button class="btn btn-soft btn-lg" data-act="flipCam">${ic('flip', 18)} Balik Kamera (Depan / Belakang)</button>` : ''}
+    <p class="fine center">Saat memakai kamera asli, AI menghitung desibel mikrofon & persentase gerakan piksel secara real-time.</p>`);
+};
+Actions.setCamMode = async el => {
+  const m = el.dataset.m;
+  closeSheet();
+  if (m === 'webcam') {
+    toast('Meminta izin kamera & mikrofon…', { icon: 'camera' });
+    const ok = await Camera.startWebcam();
+    if (ok) {
+      toast('Kamera & mikrofon asli aktif!', { icon: 'checkCircle', tone: 'ok' });
+      SimPanel.log('Beralih ke Kamera & Mikrofon perangkat asli (WebRTC)');
+    } else {
+      toast('Izin kamera ditolak atau tidak tersedia, tetap di mode simulasi', { icon: 'alert', tone: 'warn' });
+    }
+  } else {
+    Camera.stopWebcam();
+    toast('Kembali ke kamera simulasi AI', { icon: 'sparkles' });
+    SimPanel.log('Beralih ke Kamera Simulasi AI');
+  }
+  App.refresh();
+  SimPanel.render();
+};
+Actions.flipCam = async () => {
+  closeSheet();
+  const ok = await Camera.flipWebcam();
+  if (ok) toast('Kamera dibalik', { icon: 'flip' });
+  App.refresh();
+};
 // matikan audio kamar saat keluar dari live
 const _render = App.render.bind(App);
 App.render = function () {
@@ -655,20 +935,31 @@ App.render = function () {
   _render();
 };
 
-/* ---------------- AKTIVITAS (notifikasi + riwayat) ---------------- */
+/* ---------------- AKTIVITAS (notifikasi + riwayat + perawatan) ---------------- */
+const CARE_TYPES = {
+  milk: { label: 'ASI / Susu', icon: 'bottle', tone: 'pri' },
+  diaper: { label: 'Ganti Popok', icon: 'droplet', tone: 'info' },
+  temp: { label: 'Suhu Tubuh', icon: 'thermo', tone: 'warn' },
+  note: { label: 'Catatan / Obat', icon: 'heart', tone: 'ok' },
+};
 Screens.history = {
   render({ tab = 'events', f = 'all' }) {
     const pending = Store.s.events.filter(e => !e.ack && e.level !== 'info');
     return `<header class="top"><div><div class="hello big">Aktivitas</div></div>
-      <div class="top-act"><button class="icon-btn soft" data-go="settings" aria-label="Pengaturan">${ic('settings', 20)}</button></div></header>
+      <div class="top-act">
+        <button class="icon-btn soft" data-act="careSheet" aria-label="Tambah perawatan">${ic('plus', 20)}</button>
+        <button class="icon-btn soft" data-go="settings" aria-label="Pengaturan">${ic('settings', 20)}</button>
+      </div></header>
     <div class="pad-x">
       <div class="seg seg-lg">
         <label><input type="radio" name="ht" ${tab === 'events' ? 'checked' : ''} data-go="history" data-param='{"tab":"events"}'><span>${ic('bell', 15)} Kejadian</span></label>
+        <label><input type="radio" name="ht" ${tab === 'care' ? 'checked' : ''} data-go="history" data-param='{"tab":"care"}'><span>${ic('heart', 15)} Rawat</span></label>
         <label><input type="radio" name="ht" ${tab === 'stats' ? 'checked' : ''} data-go="history" data-param='{"tab":"stats"}'><span>${ic('moon', 15)} Tidur</span></label>
+        <label><input type="radio" name="ht" ${tab === 'growth' ? 'checked' : ''} data-go="history" data-param='{"tab":"growth"}'><span>${ic('ruler', 15)} Tumbuh</span></label>
       </div>
       ${tab === 'events' ? `
         ${pending.length ? `<button class="pending" data-act="ackAll">${ic('alert', 20)}<b>${pending.length} belum dicek</b><span>Konfirmasi ${ic('check', 16)}</span></button>` : ''}
-        ${historyEvents(f)}` : historyStats()}
+        ${historyEvents(f)}` : tab === 'care' ? historyCare() : tab === 'growth' ? historyGrowth() : historyStats()}
     </div>`;
   },
   mount() { setTimeout(() => { Store.s.readUpTo = Date.now(); Store.save(); updateBadges(); }, 1500); },
@@ -678,9 +969,72 @@ function historyEvents(f) {
   let list = Store.s.events;
   if (f === 'alert') list = list.filter(e => e.level !== 'info');
   const chips = [['all', 'Semua'], ['alert', 'Penting']];
-  return `<div class="chips">${chips.map(([k, l]) => `<button class="chip ${f === k ? 'chip-on' : ''}" data-go="history" data-param='{"tab":"events","f":"${k}"}'>${l}</button>`).join('')}</div>
+  return `<div class="chips">${chips.map(([k, l]) => `<button class="chip ${f === k ? 'chip-on' : ''}" data-go="history" data-param='{"tab":"events","f":"${k}"}'>${l}</button>`).join('')}
+      <button class="chip" style="margin-left:auto" data-act="exportCsv">${ic('download', 13)} CSV</button>
+    </div>
     ${groupByDay(list).map(g => `<div class="day-h">${g.d}</div><div class="card list ev-list">${g.items.map(eventRow).join('')}</div>`).join('') || `<div class="empty">${ic('bell', 40)}<p>Belum ada kejadian</p></div>`}`;
 }
+function historyCare() {
+  const list = Store.s.careLog || [];
+  const today = list.filter(c => new Date(c.ts).toDateString() === new Date().toDateString());
+  const milkCnt = today.filter(c => c.type === 'milk').length;
+  const diaperCnt = today.filter(c => c.type === 'diaper').length;
+  const lastTemp = list.find(c => c.type === 'temp')?.detail.split(' ')[0] || '36.6';
+  return `
+    <div class="sum-grid three">
+      <div class="sum"><span>${ic('bottle', 18)}</span><b>${milkCnt}<small>x</small></b><small>susu hari ini</small></div>
+      <div class="sum"><span>${ic('droplet', 18)}</span><b>${diaperCnt}<small>x</small></b><small>popok hari ini</small></div>
+      <div class="sum"><span>${ic('thermo', 18)}</span><b>${esc(lastTemp)}<small>°C</small></b><small>suhu terakhir</small></div>
+    </div>
+    <button class="btn btn-pri btn-lg" data-act="careSheet">${ic('plus', 18)} Catat Susu / Popok / Suhu</button>
+    ${groupByDay(list).map(g => `<div class="day-h">${g.d}</div><div class="card list ev-list">${g.items.map(c => {
+      const T = CARE_TYPES[c.type] || CARE_TYPES.note;
+      return `<div class="ev-row">
+        <span class="ev-ic tone-${T.tone === 'pri' ? 'info' : T.tone}">${ic(T.icon, 18)}</span>
+        <span class="ev-main"><b>${esc(c.label)} · ${esc(c.detail)}</b><small>${fmtTime(c.ts)} · oleh ${esc(c.by || 'Bunda')}</small></span>
+        <button class="icon-btn" data-act="delCare" data-id="${c.id}" aria-label="Hapus">${ic('trash', 15)}</button>
+      </div>`;
+    }).join('')}</div>`).join('') || `<div class="empty">${ic('heart', 40)}<p>Belum ada catatan perawatan</p></div>`}`;
+}
+Actions.careSheet = () => sheet(`<h3 class="sheet-title">${ic('heart', 20)} Catat Perawatan Bayi</h3>
+  <form class="form" id="care-form">
+    <div class="opt-grid four" id="care-type-grid">
+      ${Object.entries(CARE_TYPES).map(([k, v], i) => `<label class="opt ${i === 0 ? 'on' : ''}"><input type="radio" name="type" value="${k}" ${i === 0 ? 'checked' : ''} class="hidden">${ic(v.icon, 20)}<span>${v.label.split(' ')[0]}</span></label>`).join('')}
+    </div>
+    <label class="field"><span id="care-dtl-lbl">Jumlah / Keterangan</span><input name="detail" id="care-dtl-in" required placeholder="cth. 120 ml · Habis" value="110 ml · Habis"></label>
+    <div class="chips" id="care-presets">
+      ${['90 ml · Habis', '120 ml · ASI', 'Pipis (basah)', 'BAB + Pipis', '36.6 °C · Normal', 'Vitamin D'].map(p => `<button type="button" class="chip chip-pri" data-act="carePreset">${p}</button>`).join('')}
+    </div>
+    <button class="btn btn-pri btn-lg" type="submit">${ic('check', 18)} Simpan Catatan</button>
+  </form>`, {
+  onMount: el => {
+    $$('#care-type-grid label', el).forEach(lb => lb.onclick = () => {
+      $$('#care-type-grid label', el).forEach(x => x.classList.toggle('on', x === lb));
+      const v = $('input', lb).value;
+      const def = { milk: '110 ml · Habis', diaper: 'Pipis (basah)', temp: '36.7 °C · Normal', note: 'Tidur siang tenang' }[v];
+      $('#care-dtl-in', el).value = def;
+    });
+    $('#care-form', el).onsubmit = e => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      const t = f.get('type') || 'milk';
+      Store.s.careLog = Store.s.careLog || [];
+      Store.s.careLog.unshift({
+        id: 'c' + uid(), type: t, label: CARE_TYPES[t].label,
+        detail: String(f.get('detail')).trim(), ts: Date.now(), by: (Store.s.user?.name || 'Bunda').split(' ')[0],
+      });
+      Store.save(); closeSheet();
+      toast('Catatan perawatan disimpan', { icon: 'heart', tone: 'ok' });
+      if (App.route.name === 'history') App.go('history', { tab: 'care' }, { replace: true });
+      else App.refresh();
+    };
+  },
+});
+Actions.carePreset = el => { const inp = $('#care-dtl-in'); if (inp) inp.value = el.textContent; };
+Actions.delCare = el => {
+  Store.s.careLog = (Store.s.careLog || []).filter(c => c.id !== el.dataset.id);
+  Store.save(); toast('Catatan dihapus'); App.refresh();
+};
 function historyStats() {
   const s = Store.s;
   const today = { date: new Date().toISOString().slice(0, 10), hours: +((s.stats.sleptToday + todayBaseSleep()) / 3600).toFixed(1) };
@@ -702,8 +1056,138 @@ function historyStats() {
       <div class="ch-h"><b>Durasi tidur</b><small>garis hijau = 12 jam</small></div>
       <div class="bars">${days.map((d, i) => `<div class="bar-col ${i === days.length - 1 ? 'today' : ''}"><em>${d.hours}</em><div class="bar-track"><i style="height:${Math.min(100, d.hours / maxH * 100)}%"></i><span class="ref" style="bottom:${12 / maxH * 100}%"></span></div><small>${i === days.length - 1 ? 'Ini' : dayName(d.date)}</small></div>`).join('')}</div>
     </div>
-    <div class="card">${sleepTimeline()}</div>`;
+    <div class="card">${sleepTimeline()}</div>
+    <button class="btn btn-soft btn-lg" data-act="printReport">${ic('download', 18)} Cetak Laporan Dokter Anak (PDF)</button>`;
 }
+Actions.printReport = () => {
+  const s = Store.s, b = s.baby;
+  const gList = s.growthLog || [], lastG = gList[gList.length - 1] || {};
+  const cList = (s.careLog || []).slice(0, 10);
+  const eList = s.events.filter(e => e.level !== 'info').slice(0, 10);
+  const w = window.open('', '_blank', 'width=800,height=900');
+  if (!w) { toast('Izinkan pop-up browser untuk mencetak PDF', { icon: 'alert', tone: 'warn' }); return; }
+  w.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Laporan Kesehatan & Pemantauan Bayi — ${esc(b.name)}</title>
+  <style>
+    body{font-family:system-ui,-apple-system,sans-serif;color:#1a1d3a;padding:32px;line-height:1.5}
+    h1{margin:0 0 4px;color:#5B6CF9} h2{font-size:16px;margin:24px 0 8px;border-bottom:2px solid #eef0f6;padding-bottom:4px}
+    .meta{color:#6e7397;font-size:13px;margin-bottom:20px}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+    .box{border:1px solid #e8eaf4;border-radius:12px;padding:12px}
+    .box b{font-size:20px;display:block} .box small{color:#6e7397;font-size:12px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #eef0f6}
+    th{background:#f5f6fa;color:#6e7397}
+    @media print{button{display:none}}
+  </style></head><body>
+  <button onclick="window.print()" style="float:right;padding:8px 16px;background:#5B6CF9;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:pointer">Cetak / Simpan PDF</button>
+  <h1>Laporan Pemantauan & Tumbuh Kembang Bayi</h1>
+  <div class="meta">Dicetak dari AI Baby Monitor · ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}</div>
+  <div class="grid">
+    <div class="box"><small>Nama Bayi</small><b>${esc(b.name)}</b><small>${babyAge(b.birth)}</small></div>
+    <div class="box"><small>Berat / Tinggi</small><b>${lastG.weight || '-'} kg / ${lastG.height || '-'} cm</b><small>Lingkar kepala: ${lastG.head || '-'} cm</small></div>
+    <div class="box"><small>Rata-rata Tidur</small><b>12.1 jam/hari</b><small>7 hari terakhir</small></div>
+    <div class="box"><small>Catatan Kesehatan</small><b>${esc(b.note || 'Normal')}</b><small>Tidak ada keluhan</small></div>
+  </div>
+  <h2>Riwayat Pengukuran Tumbuh Kembang (KMS)</h2>
+  <table><thead><tr><th>Bulan</th><th>Tanggal</th><th>Berat (kg)</th><th>Tinggi (cm)</th><th>Lingkar Kepala (cm)</th><th>Catatan</th></tr></thead>
+  <tbody>${gList.map(g => `<tr><td>Bulan ke-${g.month}</td><td>${g.date}</td><td>${g.weight}</td><td>${g.height}</td><td>${g.head}</td><td>${esc(g.note || '-')}</td></tr>`).join('')}</tbody></table>
+  <h2>Riwayat Perawatan Terbaru (ASI / Popok / Suhu)</h2>
+  <table><thead><tr><th>Waktu</th><th>Kategori</th><th>Detail</th><th>Dicatat Oleh</th></tr></thead>
+  <tbody>${cList.map(c => `<tr><td>${fmtDay(c.ts)} ${fmtTime(c.ts)}</td><td>${esc(c.label)}</td><td>${esc(c.detail)}</td><td>${esc(c.by || 'Bunda')}</td></tr>`).join('')}</tbody></table>
+  <h2>Log Deteksi Anomali AI</h2>
+  <table><thead><tr><th>Waktu</th><th>Kejadian</th><th>Level</th><th>Status</th><th>Waktu Respon</th></tr></thead>
+  <tbody>${eList.map(e => `<tr><td>${fmtDay(e.ts)} ${fmtTime(e.ts)}</td><td>${esc(Engine.TYPES[e.type]?.label || e.type)}</td><td>${e.level}</td><td>${e.falseAlarm ? 'Alarm Palsu' : 'Dikonfirmasi'}</td><td>${e.ackSec || 0} dtk</td></tr>`).join('')}</tbody></table>
+  <p style="margin-top:28px;font-size:11px;color:#6e7397">*Dokumen ini dihasilkan oleh sistem pemantauan AI Baby Monitor sebagai referensi pendukung konsultasi dokter spesialis anak (DSA).</p>
+  </body></html>`);
+  w.document.close();
+};
+
+const MILESTONES = [
+  ['smile', 'Tersenyum sosial', '1–2 bln'],
+  ['headUp', 'Mengangkat kepala tegak', '2–3 bln'],
+  ['rollOver', 'Tengkurap & berguling', '3–4 bln'],
+  ['babble', 'Mengoceh (cooing/babbling)', '4–5 bln'],
+  ['sit', 'Duduk dengan bantuan', '5–6 bln'],
+  ['crawl', 'Merangkak aktif', '7–9 bln'],
+];
+function historyGrowth() {
+  const list = Store.s.growthLog || [];
+  const last = list[list.length - 1] || { weight: 6.4, height: 62.4, head: 40.9 };
+  const prev = list[list.length - 2] || last;
+  const dw = (last.weight - prev.weight).toFixed(1);
+  const maxW = 10;
+  const ms = Store.s.milestones || {};
+  return `
+    <div class="sum-grid three">
+      <div class="sum"><span>${ic('baby', 18)}</span><b>${last.weight}<small>kg</small></b><small>${dw >= 0 ? '+' + dw : dw} kg bln ini</small></div>
+      <div class="sum"><span>${ic('ruler', 18)}</span><b>${last.height}<small>cm</small></b><small>panjang badan</small></div>
+      <div class="sum"><span>${ic('sparkles', 18)}</span><b>${last.head}<small>cm</small></b><small>lingkar kepala</small></div>
+    </div>
+    <div class="card chart-card">
+      <div class="ch-h"><b>Kurva Berat Badan (KMS / WHO)</b><small>garis hijau = median normal</small></div>
+      <div class="bars" style="grid-template-columns:repeat(${Math.max(1, list.length)},1fr)">
+        ${list.map((g, i) => `<div class="bar-col ${i === list.length - 1 ? 'today' : ''}">
+          <em>${g.weight}</em>
+          <div class="bar-track"><i style="height:${Math.min(100, (g.weight / maxW) * 100)}%"></i><span class="ref" style="bottom:${(3.3 + i * 0.75) / maxW * 100}%"></span></div>
+          <small>Bln ${g.month ?? i}</small>
+        </div>`).join('')}
+      </div>
+    </div>
+    <button class="btn btn-pri btn-lg" data-act="growthSheet">${ic('plus', 18)} Catat Berat & Tinggi Baru</button>
+    <div class="sec-h"><h3>Milestone Perkembangan</h3></div>
+    <div class="card list">
+      ${MILESTONES.map(([k, l, age]) => `<button class="li" data-act="toggleMilestone" data-k="${k}">
+        <span class="st ${ms[k] ? 'st-ok' : 'st-muted'}">${ic(ms[k] ? 'check' : 'clock', 13)}</span>
+        <span><b>${l}</b><small>Usia umum: ${age}</small></span>
+        <span class="chip ${ms[k] ? 'chip-ok' : 'chip-muted'}">${ms[k] ? 'Tercapai' : 'Belum'}</span>
+      </button>`).join('')}
+    </div>`;
+}
+Actions.toggleMilestone = el => {
+  const k = el.dataset.k;
+  Store.s.milestones = Store.s.milestones || {};
+  Store.s.milestones[k] = !Store.s.milestones[k];
+  Store.save();
+  toast(Store.s.milestones[k] ? 'Milestone tercapai! 🎉' : 'Status milestone diubah', { icon: 'sparkles', tone: 'ok' });
+  App.refresh();
+};
+Actions.growthSheet = () => {
+  const list = Store.s.growthLog || [];
+  const last = list[list.length - 1] || { weight: 6.4, height: 62.4, head: 40.9, month: 4 };
+  sheet(`<h3 class="sheet-title">${ic('ruler', 20)} Catat Tumbuh Kembang</h3>
+    <form class="form" id="growth-form">
+      <div class="grid2">
+        <label class="field"><span>Berat Badan (kg)</span><input name="weight" type="number" step="0.1" min="1" max="25" value="${(last.weight + 0.3).toFixed(1)}" required></label>
+        <label class="field"><span>Panjang / Tinggi (cm)</span><input name="height" type="number" step="0.1" min="30" max="120" value="${(last.height + 1.2).toFixed(1)}" required></label>
+      </div>
+      <div class="grid2">
+        <label class="field"><span>Lingkar Kepala (cm)</span><input name="head" type="number" step="0.1" min="25" max="60" value="${(last.head + 0.4).toFixed(1)}" required></label>
+        <label class="field"><span>Usia (Bulan ke-)</span><input name="month" type="number" min="0" max="36" value="${(last.month ?? list.length) + 1}" required></label>
+      </div>
+      <label class="field"><span>Catatan Imunisasi / Posyandu</span><input name="note" placeholder="cth. Vaksin DPT-HB-Hib 2"></label>
+      <button class="btn btn-pri btn-lg" type="submit">${ic('check', 18)} Simpan Pengukuran</button>
+    </form>`, {
+    onMount: el => {
+      $('#growth-form', el).onsubmit = e => {
+        e.preventDefault();
+        const f = new FormData(e.target);
+        Store.s.growthLog = Store.s.growthLog || [];
+        Store.s.growthLog.push({
+          id: 'g' + uid(),
+          date: new Date().toISOString().slice(0, 10),
+          month: +f.get('month'),
+          weight: +f.get('weight'),
+          height: +f.get('height'),
+          head: +f.get('head'),
+          note: String(f.get('note') || '').trim(),
+        });
+        Store.save(); closeSheet();
+        toast('Data tumbuh kembang disimpan', { icon: 'ruler', tone: 'ok' });
+        App.go('history', { tab: 'growth' }, { replace: true });
+      };
+    },
+  });
+};
 Actions.ackAll = () => {
   if (Alarm.current) { Alarm.ack(false); return; }
   const now = Date.now();
@@ -765,7 +1249,7 @@ Screens.profile = {
         <button class="icon-btn soft" data-act="editUser" aria-label="Ubah profil">${ic('edit', 18)}</button>
       </div>
       <div class="card baby-mini" data-go="baby">
-        <span class="baby-av sm">${ic('baby', 26)}</span>
+        <span class="baby-av sm">${babyAvatarHtml('sm')}</span>
         <div><b>${esc(s.baby.name)}</b><small>${babyAge(s.baby.birth)}</small></div>${ic('chevR', 18)}
       </div>
       <div class="mtiles two">
@@ -885,6 +1369,11 @@ Screens.devices = {
         <span>${ic(Engine.sim.internet ? 'cloud' : 'router', 20)}</span>
         <b>${Engine.sim.internet ? 'Cloud AI terhubung' : 'Gateway lokal aktif'}</b><i class="dot ${Engine.sim.internet ? 'ok' : 'warn'}"></i>
       </div>
+      <div class="grp-h">${ic('radio', 15)}<b>Mode 2 Perangkat & Kamera Asli</b></div>
+      <div class="card list">
+        <button class="li" data-act="camSourceSheet">${ic('camera', 20)}<span><b>Gunakan Kamera Perangkat Ini</b><small>${Camera.view.mode === 'webcam' ? 'Aktif — kamera & mikrofon real-time' : 'Beralih dari simulasi ke kamera asli'}</small></span>${ic('chevR', 18)}</button>
+        <button class="li" data-act="syncSheet">${ic('link', 20)}<span><b>Sinkronisasi 2 Tab / Perangkat</b><small>Kode ruang: ${esc(s.settings.roomCode || 'AIBM-88')} · Broadcast & Cloud API</small></span>${ic('chevR', 18)}</button>
+      </div>
     </div>`;
   },
 };
@@ -982,7 +1471,8 @@ Screens.security = {
       <div class="card sec-hero">${ic('shield', 30)}<div><b>Video Anda terlindungi</b><small>Enkripsi end-to-end (AES-256) · Koneksi TLS 1.3 · Server di Singapura</small></div></div>
       <div class="card">
         <div class="set-row"><div class="set-main"><b>Verifikasi 2 langkah</b><small>Kode OTP via WhatsApp saat login di HP baru</small></div>${toggle('settings.twoFA', S.twoFA)}</div>
-        <div class="set-row"><div class="set-main"><b>Kunci aplikasi (PIN / Face ID)</b><small>Minta PIN saat membuka aplikasi</small></div>${toggle('settings.pin', S.pin)}</div>
+        <div class="set-row"><div class="set-main"><b>Kunci aplikasi (PIN / Face ID)</b><small>Minta PIN (${esc(S.pinCode || '1234')}) saat membuka aplikasi</small></div>${toggle('settings.pin', S.pin, 'rerender')}</div>
+        ${S.pin ? `<div class="set-row"><div class="set-main"><b>Kode PIN 4 Digit</b><small>Ketuk untuk mengubah atau menguji kunci</small></div><div class="btn-row"><button class="btn btn-sm btn-soft" data-act="changePin">${ic('key', 14)} Ubah PIN</button><button class="btn btn-sm btn-pri" data-act="lockNow">${ic('lock', 14)} Kunci</button></div></div>` : ''}
         <div class="set-row"><div class="set-main"><b>Enkripsi end-to-end</b><small>Selalu aktif untuk semua stream</small></div><span class="chip chip-ok">Aktif</span></div>
       </div>
       <div class="sec-h"><h3>Sesi aktif</h3></div>
@@ -992,7 +1482,7 @@ Screens.security = {
       </div>
       <div class="sec-h"><h3>Data & privasi</h3></div>
       <div class="card list">
-        <button class="li" data-act="exportCsv">${ic('download', 20)}<span><b>Unduh data saya</b><small>Riwayat kejadian (CSV)</small></span>${ic('chevR', 18)}</button>
+        <button class="li" data-act="exportCsv">${ic('download', 20)}<span><b>Unduh data saya</b><small>Riwayat kejadian & perawatan (CSV)</small></span>${ic('chevR', 18)}</button>
         <button class="li danger" data-act="wipeRec">${ic('trash', 20)}<span><b>Hapus semua rekaman & cuplikan</b></span>${ic('chevR', 18)}</button>
       </div>
     </div>`;
@@ -1000,6 +1490,47 @@ Screens.security = {
 };
 Actions.revoke = el => { el.closest('.li').remove(); toast('Sesi dikeluarkan'); };
 Actions.wipeRec = async () => { if (await confirmBox('Hapus semua rekaman?', 'Semua cuplikan kejadian akan dihapus permanen dari cloud dan perangkat ini.', 'Hapus', true)) { Store.s.events.forEach(e => delete e.snap); Store.save(); toast('Semua rekaman dihapus'); } };
+Actions.lockNow = () => {
+  Store.s.settings.pin = true; Store.save();
+  pinUnlocked = false; pinBuf = '';
+  App.go('pinLock', {}, { reset: true });
+};
+Actions.changePin = () => sheet(`<h3 class="sheet-title">${ic('key', 20)} Ubah Kode PIN</h3>
+  <form class="form" id="pin-form">
+    <label class="field"><span>PIN 4 Digit Baru</span><input name="pin" pattern="^\\d{4}$" maxlength="4" inputmode="numeric" value="${esc(Store.s.settings.pinCode || '1234')}" required></label>
+    <button class="btn btn-pri btn-lg" type="submit">Simpan PIN</button>
+  </form>`, {
+  onMount: el => {
+    $('#pin-form', el).onsubmit = e => {
+      e.preventDefault();
+      const p = new FormData(e.target).get('pin');
+      Store.s.settings.pinCode = p; Store.s.settings.pin = true; Store.save();
+      closeSheet(); toast('Kode PIN berhasil diperbarui', { icon: 'lock', tone: 'ok' }); App.refresh();
+    };
+  },
+});
+Actions.exportCsv = () => {
+  const rows = [['Waktu', 'Kategori', 'Jenis', 'Level', 'Dikonfirmasi Oleh', 'Respon (dtk)', 'Alarm Palsu', 'Latensi (dtk)', 'Suara (dB)', 'Gerak (%)', 'Napas (/mnt)']];
+  Store.s.events.forEach(e => {
+    const T = Engine.TYPES[e.type] || { label: e.type };
+    rows.push([
+      new Date(e.ts).toISOString(), 'Deteksi AI', T.label, e.level,
+      e.ackBy || '-', e.ackSec || 0, e.falseAlarm ? 'Ya' : 'Tidak', e.latency || '',
+      e.metrics?.db ?? '', e.metrics?.motion ?? '', e.metrics?.rpm ?? '',
+    ]);
+  });
+  (Store.s.careLog || []).forEach(c => {
+    rows.push([new Date(c.ts).toISOString(), 'Perawatan', c.label, c.detail, c.by || 'Bunda', '', '', '', '', '', '']);
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `ai-baby-monitor-${Store.s.baby.name.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+  toast('Data CSV berhasil diunduh', { icon: 'download', tone: 'ok' });
+};
 
 /* ---------------- BANTUAN / TENTANG ---------------- */
 Screens.help = {
@@ -1028,3 +1559,132 @@ Screens.help = {
   },
 };
 Actions.contact = () => toast('Di aplikasi asli, ini membuka WhatsApp/Email', { icon: 'info' });
+
+/* ---------------- SINKRONISASI 2 PERANGKAT & BACKEND API ---------------- */
+const Sync = (() => {
+  let bc = null, txTimer = null, apiOnline = false;
+  try { bc = new BroadcastChannel('aibm_sync_channel'); } catch (e) { /* */ }
+
+  if (bc) {
+    bc.onmessage = e => {
+      const d = e.data;
+      if (!d || d.room !== Store.s.settings.roomCode) return;
+      if (d.type === 'frame' && Camera.view.mode === 'remote') {
+        Camera.setRemoteFrame(d.frame);
+        Object.assign(Engine.live, d.live);
+        Engine.sim.state = d.state;
+        updateBindings();
+      } else if (d.type === 'alert') {
+        Store.addEvent(d.ev);
+        Alarm.handle(d.ev);
+      } else if (d.type === 'ack') {
+        Alarm.stop();
+        App.refresh();
+      }
+    };
+  }
+
+  function startBroadcast() {
+    clearInterval(txTimer);
+    txTimer = setInterval(() => {
+      if (bc && Camera.view.mode !== 'remote') {
+        bc.postMessage({
+          room: Store.s.settings.roomCode,
+          type: 'frame',
+          frame: Camera.snapshot(320, .55),
+          live: Engine.live,
+          state: Engine.sim.state,
+        });
+      }
+      // Jika backend URL disetel, kirim heartbeat / frame
+      const url = Store.s.settings.backendUrl;
+      if (url && Engine.sim.internet && Camera.view.mode !== 'remote') {
+        fetch(`${url.replace(/\/$/, '')}/ingest/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Ingest-Token': Store.s.settings.ingestToken || '' },
+          body: JSON.stringify({
+            camera_id: Store.s.cameras[0]?.id || 'cam-01',
+            status: Engine.sim.state,
+            db: Math.round(Engine.live.db),
+            motion: Math.round(Engine.live.motion),
+            rpm: Math.round(Engine.live.rpm),
+          }),
+        }).then(r => { apiOnline = r.ok; }).catch(() => { apiOnline = false; });
+      }
+    }, 1500);
+  }
+  startBroadcast();
+
+  Engine.on('alert', ev => {
+    if (bc) bc.postMessage({ room: Store.s.settings.roomCode, type: 'alert', ev });
+    const url = Store.s.settings.backendUrl;
+    if (url && Engine.sim.internet) {
+      fetch(`${url.replace(/\/$/, '')}/v1/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Ingest-Token': Store.s.settings.ingestToken || '' },
+        body: JSON.stringify({ type: ev.type, level: ev.level, latency: ev.latency, metrics: ev.metrics }),
+      }).catch(() => {});
+    }
+  });
+
+  return { get apiOnline() { return apiOnline; } };
+})();
+
+Actions.syncSheet = () => {
+  const s = Store.s.settings;
+  const isRemote = Camera.view.mode === 'remote';
+  sheet(`<h3 class="sheet-title">${ic('link', 20)} Sinkronisasi & Server Backend</h3>
+    <p class="muted small">Gunakan 2 tab/perangkat sebagai <b>Unit Kamera Bayi</b> dan <b>Unit Orang Tua</b>, atau hubungkan ke server FastAPI sesuai PRD.</p>
+    <div class="seg">
+      <label><input type="radio" name="roleMode" ${!isRemote ? 'checked' : ''} data-act="setRoleMode" data-m="sender"><span>Unit Kamera / Utama</span></label>
+      <label><input type="radio" name="roleMode" ${isRemote ? 'checked' : ''} data-act="setRoleMode" data-m="receiver"><span>Penerima (Orang Tua)</span></label>
+    </div>
+    <form class="form" id="sync-form">
+      <label class="field"><span>Kode Ruang Sinkronisasi</span><input name="room" value="${esc(s.roomCode || 'AIBM-88')}" required></label>
+      <label class="field"><span>URL Backend FastAPI (opsional)</span><input name="url" placeholder="http://127.0.0.1:8000" value="${esc(s.backendUrl || '')}"></label>
+      <label class="field"><span>Token Ingest (.env)</span><input name="token" value="${esc(s.ingestToken || 'aibm-secret-token-2026')}"></label>
+      <div class="btn-row">
+        <button type="button" class="btn btn-soft" data-act="testBackend">${ic('activity', 16)} Cek /health</button>
+        <button type="submit" class="btn btn-pri">Simpan</button>
+      </div>
+    </form>`, {
+    onMount: el => {
+      $('#sync-form', el).onsubmit = e => {
+        e.preventDefault();
+        const f = new FormData(e.target);
+        s.roomCode = String(f.get('room')).trim();
+        s.backendUrl = String(f.get('url')).trim();
+        s.ingestToken = String(f.get('token')).trim();
+        Store.save(); closeSheet();
+        toast('Konfigurasi sinkronisasi disimpan', { icon: 'checkCircle', tone: 'ok' });
+        App.refresh();
+      };
+    },
+  });
+};
+Actions.setRoleMode = el => {
+  if (el.dataset.m === 'receiver') {
+    Camera.stopWebcam();
+    Camera.view.mode = 'remote';
+    toast('Mode Penerima aktif — menunggu stream dari Unit Kamera', { icon: 'radio' });
+  } else {
+    Camera.view.mode = 'sim';
+    toast('Mode Unit Kamera / Utama aktif', { icon: 'cctv' });
+  }
+  App.refresh();
+};
+Actions.testBackend = async () => {
+  const inp = $('#sync-form input[name=url]');
+  const url = (inp?.value || Store.s.settings.backendUrl || 'http://127.0.0.1:8000').replace(/\/$/, '');
+  try {
+    const r = await fetch(`${url}/health`);
+    const j = await r.json();
+    if (r.ok) {
+      if (inp) inp.value = url;
+      Store.s.settings.backendUrl = url; Store.save();
+      toast(`Backend FastAPI Online (${j.status || 'ok'})`, { icon: 'checkCircle', tone: 'ok' });
+    } else toast('Backend merespon dengan error', { icon: 'alert', tone: 'bad' });
+  } catch (e) {
+    toast(`Tidak dapat terhubung ke ${url}/health`, { icon: 'wifiOff', tone: 'warn' });
+  }
+};

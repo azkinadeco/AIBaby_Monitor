@@ -62,8 +62,8 @@ const Engine = (() => {
   };
   const SENS_DELAY = { tinggi: 1, sedang: 2, rendah: 4 };
 
-  const sim = { state: 'sleep', since: Date.now(), camOnline: true, internet: true, forceNight: null };
-  const live = { db: 34, motion: 4, rpm: 33, pose: 'Telentang', status: 'sleep', conf: 97, latency: 1.1 };
+  const sim = { state: 'sleep', since: Date.now(), camOnline: true, internet: true, forceNight: null, hotRoom: false };
+  const live = { db: 34, motion: 4, rpm: 33, pose: 'Telentang', status: 'sleep', conf: 97, latency: 1.1, roomTemp: 25.4, roomHum: 54 };
   const hist = { db: [], motion: [], rpm: [] };
   const held = {}, active = {}, clearFor = {};
   const listeners = {};
@@ -129,25 +129,40 @@ const Engine = (() => {
     const st = sim.state;
     const P = PROFILES[st];
     const k = force ? .55 : .35;
-    live.db = lerp(live.db, rnd(P.db), k);
-    live.motion = lerp(live.motion, rnd(P.motion || P.m), k);
-    live.rpm = lerp(live.rpm, rnd(P.rpm), k * .8);
-    live.pose = st === 'prone' ? 'Tengkurap' : (st === 'move' ? 'Berubah-ubah' : 'Telentang');
-    live.conf = Math.round(rnd(st === 'prone' ? [86, 93] : [94, 99]));
+    const real = Camera.sampleSensors();
+    if (real) {
+      live.db = real.db;
+      live.motion = real.motion;
+      live.rpm = lerp(live.rpm, rnd([31, 38]), k * .5);
+      if (live.db >= 65) sim.state = 'cry';
+      else if (live.motion >= 60) sim.state = 'move';
+      else if (live.motion >= 22) sim.state = 'awake';
+      else if (['cry', 'move', 'awake'].includes(sim.state)) sim.state = 'sleep';
+    } else if (Camera.view.mode !== 'remote') {
+      live.db = lerp(live.db, rnd(P.db), k);
+      live.motion = lerp(live.motion, rnd(P.motion || P.m), k);
+      live.rpm = lerp(live.rpm, rnd(P.rpm), k * .8);
+    }
+    const curSt = sim.state;
+    live.pose = curSt === 'prone' ? 'Tengkurap' : (curSt === 'move' ? 'Berubah-ubah' : 'Telentang');
+    live.conf = Math.round(rnd(curSt === 'prone' ? [86, 93] : [94, 99]));
     live.latency = +(sim.internet ? 0.8 + Math.random() * .8 : .3 + Math.random() * .3).toFixed(1);
+    live.roomTemp = +(lerp(live.roomTemp, sim.hotRoom ? rnd([29.4, 30.8]) : rnd([24.8, 25.9]), 0.25)).toFixed(1);
+    live.roomHum = Math.round(lerp(live.roomHum, sim.hotRoom ? rnd([68, 75]) : rnd([50, 56]), 0.25));
 
     ['db', 'motion', 'rpm'].forEach(key => { hist[key].push(live[key]); if (hist[key].length > 60) hist[key].shift(); });
 
     const armed = Store.s.armed;
-    live.status = !sim.camOnline ? 'offline' : st;
+    live.status = !sim.camOnline ? 'offline' : curSt;
 
     // update tampilan kamera
     Object.assign(Camera.view, {
-      baby: st, rpm: live.rpm, online: sim.camOnline, night: isNight(),
+      baby: curSt, rpm: live.rpm, online: sim.camOnline, night: isNight(),
       overlay: Store.s.settings.aiOverlay,
+      roi: Store.s.settings.roi,
       ai: { label: `BAYI ${live.conf}%`, status: STATUS[live.status]?.ai || '', alert: ['bad', 'warn'].includes(STATUS[live.status]?.tone) },
     });
-    Sound.setCrying(st === 'cry' && sim.camOnline);
+    Sound.setCrying(curSt === 'cry' && sim.camOnline && Camera.view.mode === 'sim');
 
     // detektor
     if (sim.camOnline && armed && !force) {

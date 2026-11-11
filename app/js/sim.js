@@ -27,8 +27,10 @@ const SimPanel = (() => {
       </div>
       <div class="sp-sec">
         <h4>Sistem & jaringan</h4>
+        <div class="sp-row"><span>${ic('camera', 16)} Kamera & Mic Asli</span><label class="switch"><input type="checkbox" ${Camera.view.mode === 'webcam' ? 'checked' : ''} data-act="simWebcam"><i></i></label></div>
         <div class="sp-row"><span>${ic('cctv', 16)} Kamera online</span><label class="switch"><input type="checkbox" ${sim.camOnline ? 'checked' : ''} data-act="simCam"><i></i></label></div>
         <div class="sp-row"><span>${ic('wifi', 16)} Internet rumah</span><label class="switch"><input type="checkbox" ${sim.internet ? 'checked' : ''} data-act="simNet"><i></i></label></div>
+        <div class="sp-row"><span>${ic('thermo', 16)} Kamar panas (>29°C)</span><label class="switch"><input type="checkbox" ${sim.hotRoom ? 'checked' : ''} data-act="simHot"><i></i></label></div>
         <div class="sp-row"><span>${ic('moon', 16)} Mode malam</span><label class="switch"><input type="checkbox" ${sim.forceNight ? 'checked' : ''} data-act="simNight"><i></i></label></div>
         <div class="sp-row"><span>${ic('play', 16)} Demo otomatis</span><label class="switch"><input type="checkbox" ${Engine.autoDemo ? 'checked' : ''} data-act="simAuto"><i></i></label></div>
       </div>
@@ -64,8 +66,21 @@ Actions.simBaby = el => {
   $$('.sp-btn').forEach(b => b.classList.toggle('on', b === el));
   if (window.innerWidth < 1000) closeSim();
 };
+Actions.simWebcam = async el => {
+  if (el.checked) {
+    const ok = await Camera.startWebcam();
+    if (!ok) { el.checked = false; toast('Kamera asli tidak dapat diakses', { icon: 'alert', tone: 'warn' }); }
+    else { toast('Kamera & mikrofon perangkat asli aktif', { icon: 'camera', tone: 'ok' }); SimPanel.log('Kamera & mikrofon asli diaktifkan'); }
+  } else {
+    Camera.stopWebcam();
+    toast('Kembali ke kamera simulasi', { icon: 'sparkles' });
+    SimPanel.log('Kamera simulasi aktif');
+  }
+  App.refresh();
+};
 Actions.simCam = el => { Engine.setCamera(el.checked); SimPanel.log(el.checked ? 'Simulasi: kamera dinyalakan' : 'Simulasi: kamera mati / Wi-Fi kamera putus'); if (['home', 'devices'].includes(App.route.name)) App.refresh(); };
 Actions.simNet = el => { Engine.setInternet(el.checked); SimPanel.log(el.checked ? 'Internet tersambung' : 'Internet putus — beralih ke gateway lokal'); if (App.route.name === 'home') App.refresh(); };
+Actions.simHot = el => { Engine.sim.hotRoom = el.checked; SimPanel.log(el.checked ? 'Simulasi: suhu kamar naik (>29°C)' : 'Simulasi: suhu kamar normal (25°C)'); setTimeout(() => App.refresh(), 600); };
 Actions.simNight = el => { Engine.sim.forceNight = el.checked ? true : null; SimPanel.log(el.checked ? 'Mode malam dipaksa aktif' : 'Mode malam mengikuti pengaturan'); };
 Actions.simAuto = el => { Engine.setAutoDemo(el.checked); SimPanel.log(el.checked ? 'Demo otomatis dimulai' : 'Demo otomatis dihentikan'); };
 Actions.stopAlarmSim = () => { if (Sound.isAlarming()) { Alarm.mute(); SimPanel.log('Tombol fisik speaker ditekan — bunyi dimatikan'); } else toast('Speaker sedang tidak berbunyi', { icon: 'volumeX' }); };
