@@ -54,29 +54,6 @@ export function timeline24({ events = true, labels: showLabels = true } = {}) {
   return `<div class="tl"><div class="tl-track">${segs}${dots}</div><div class="tl-lbl">${labels}</div></div>`;
 }
 
-/* ---------------- Grafik garis mini (canvas) ---------------- */
-export function drawSpark(cv, data, { color = '#8B7CF6', max = 100, min = 0, line = null, n = 90 } = {}) {
-  const w = cv.clientWidth, h = cv.clientHeight, dpr = devicePixelRatio || 1;
-  if (!w || !h) return;
-  if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
-  const x = cv.getContext('2d');
-  x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
-  if (line != null) {
-    const ty = h - 3 - ((line - min) / (max - min)) * (h - 6);
-    x.setLineDash([3, 4]); x.strokeStyle = 'rgba(242,96,106,.55)'; x.lineWidth = 1;
-    x.beginPath(); x.moveTo(0, ty); x.lineTo(w, ty); x.stroke(); x.setLineDash([]);
-  }
-  if (data.length < 2) return;
-  const step = w / (n - 1), off = (n - data.length) * step;
-  const pts = data.map((v, i) => [off + i * step, h - 3 - ((clamp(v, min, max) - min) / (max - min)) * (h - 6)]);
-  x.beginPath(); pts.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py)));
-  x.strokeStyle = color; x.lineWidth = 2; x.lineJoin = 'round'; x.stroke();
-  x.lineTo(pts.at(-1)[0], h); x.lineTo(pts[0][0], h); x.closePath();
-  const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, color + '55'); g.addColorStop(1, color + '00');
-  x.fillStyle = g; x.fill();
-}
-export const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-
 /* ---------------- Lagu & penenang ---------------- */
 let lullMins = 30;
 export function openLullSheet() {
@@ -231,3 +208,16 @@ export function sinceText() {
   return { from, text: `sejak ${fmtTime(from)} · ${fmtDur(Date.now() - from)}` };
 }
 
+
+/** Chip kecil (suara · gerak · napas/baterai) untuk ditaruh di atas video */
+export function vitalChips() {
+  const c = (icon, word, tone) => `<span class="vchip tone-${tone}">${ic(icon, 13)}<b>${word}</b></span>`;
+  const third = live.rpm != null
+    ? c('wind', `${Math.round(live.rpm)}/mnt`, live.rpm >= 60 || live.rpm <= 18 ? 'bad' : 'ok')
+    : live.bat != null
+      ? c(live.bat < .2 ? 'batteryLow' : 'battery', `${Math.round(live.bat * 100)}%`, live.bat < .2 && !live.charging ? 'bad' : 'ok')
+      : '';
+  return c('volume', soundWord(live.level, live.cry), live.cry >= .35 || live.level >= 62 ? 'warn' : 'ok')
+    + c('move', moveWord(live.motion), live.motion >= 50 ? 'warn' : 'ok')
+    + third;
+}

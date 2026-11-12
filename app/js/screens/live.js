@@ -5,25 +5,18 @@ import { store } from '../core/store.js';
 import { bus } from '../core/bus.js';
 import { route } from '../core/router.js';
 import { actions, toast } from '../core/ui.js';
-import { live, TYPES, snapshot, setArmed, localCam } from '../services/monitor.js';
+import { live, snapshot, setArmed, localCam } from '../services/monitor.js';
 import { mountFeed } from '../services/feed.js';
 import { control, setListen } from '../services/control.js';
 import { simCam } from '../services/sim.js';
 import { link } from '../services/link.js';
-import { statusNow, soundWord, moveWord, drawSpark, cssVar, talkButtonHtml, bindTalk, linkLabel } from './shared.js';
+import { statusNow, vitalChips, talkButtonHtml, bindTalk, linkLabel } from './shared.js';
 
-const STATUS_DET = { cry: 'cry', active: 'motion', awake: 'wake', prone: 'position', vomit: 'vomit', breath: 'breath' };
 let rec = null;   // { mr, chunks, t0, timer }
 
 function statusPill() {
   const S = statusNow();
   return `<span class="tone-${S.tone}">${ic(S.icon, 15)}</span><b>${S.text}</b>`;
-}
-function detChips() {
-  const D = store.s.settings.detect, real = live.source !== 'sim';
-  const keys = real ? ['cry', 'motion', 'wake'] : ['cry', 'motion', 'wake', 'position', 'vomit', 'breath'];
-  const hit = STATUS_DET[live.status];
-  return keys.map(k => `<span class="det ${D[k].on ? '' : 'off'} ${hit === k ? 'hit' : ''}" title="${TYPES[k].short}" aria-label="${TYPES[k].short}">${ic(TYPES[k].icon, 16)}</span>`).join('');
 }
 function controls() {
   const l = control.lullState(), listen = store.s.listen;
@@ -32,14 +25,14 @@ function controls() {
     <button class="lc ${l.on ? 'on' : ''}" data-act="lullaby"><span>${ic('music', 22)}</span><small>Lagu</small></button>`;
 }
 function tools() {
-  const t = (act, icon, label, on = false) => `<button class="tool ${on ? 'on' : ''}" data-act="${act}" title="${label}" aria-label="${label}">${ic(icon, 20)}</button>`;
+  const t = (act, icon, label, on = false, word = label) => `<button class="tool ${on ? 'on' : ''}" data-act="${act}" title="${label}" aria-label="${label}"><span>${ic(icon, 20)}</span><small>${word}</small></button>`;
   return t('livePhoto', 'camera', 'Foto')
-    + t('liveRec', rec ? 'stop' : 'record', rec ? 'Stop rekam' : 'Rekam', !!rec)
-    + (live.source === 'sim' ? t('liveNight', 'moon', 'Inframerah', simCam.night) : '')
-    + (live.source === 'local' ? t('liveFlip', 'flip', 'Balik kamera') : '')
-    + t('liveArm', store.s.armed === false ? 'play' : 'pause', store.s.armed === false ? 'Aktifkan AI' : 'Jeda AI', store.s.armed === false)
-    + t('livePip', 'copy', 'Jendela mengambang')
-    + t('liveFull', 'maximize', 'Layar penuh');
+    + t('liveRec', rec ? 'stop' : 'record', rec ? 'Stop rekam' : 'Rekam', !!rec, rec ? 'Stop' : 'Rekam')
+    + (live.source === 'sim' ? t('liveNight', 'moon', 'Inframerah', simCam.night, 'Malam') : '')
+    + (live.source === 'local' ? t('liveFlip', 'flip', 'Balik kamera', false, 'Balik') : '')
+    + t('liveArm', store.s.armed === false ? 'play' : 'pause', store.s.armed === false ? 'Aktifkan AI' : 'Jeda AI', store.s.armed === false, store.s.armed === false ? 'Aktifkan' : 'Jeda')
+    + t('livePip', 'copy', 'Jendela mengambang', false, 'Melayang')
+    + t('liveFull', 'maximize', 'Layar penuh', false, 'Penuh');
 }
 
 route('live', {
@@ -56,31 +49,19 @@ route('live', {
     <div class="live-view" id="live-view">
       <div class="lv-top"><span class="live-tag"><i></i>LIVE</span>${rec ? `<span class="rec-tag"><i></i><span id="rec-time">00:00</span></span>` : ''}</div>
       <div class="lv-nosig">${ic('wifiOff', 30)}<b>Menunggu gambar…</b></div>
-      <div class="lv-status" id="live-status">${statusPill()}</div>
+      <div class="lv-bottom"><div class="lv-status" id="live-status">${statusPill()}</div><div class="hc-chips" id="live-vit">${vitalChips()}</div></div>
     </div>
     <div class="live-ctl" id="live-ctl">${controls()}</div>
     <div class="tools" id="live-tools">${tools()}</div>
-    <div class="meters">
-      <div class="meter-row"><span class="m-ic tone-accent">${ic('volume', 16)}</span><canvas class="spark" id="sp-sound"></canvas><b id="m-sound">${soundWord(live.level, live.cry)}</b></div>
-      <div class="meter-row"><span class="m-ic tone-pri">${ic('move', 16)}</span><canvas class="spark" id="sp-move"></canvas><b id="m-move">${moveWord(live.motion)}</b></div>
-      <div class="dets" id="live-dets">${detChips()}</div>
-    </div>`;
+`;
   },
   mount(root) {
     const view = $('#live-view', root);
     const feedOff = mountFeed(view);
     const talkOff = bindTalk(root);
-    const colA = cssVar('--accent') || '#F5C28A', colB = cssVar('--pri') || '#8B7CF6';
-    const draw = () => {
-      drawSpark($('#sp-sound', root), live.hist.level, { color: colA, line: 62 });
-      drawSpark($('#sp-move', root), live.hist.motion, { color: colB });
-      $('#m-sound', root).textContent = soundWord(live.level, live.cry);
-      $('#m-move', root).textContent = moveWord(live.motion);
-    };
-    draw();
     const set = (id, html) => { const el = $(id, root); if (el) el.innerHTML = html; };
     const offs = [
-      bus.on('tick', () => { draw(); set('#live-dets', detChips()); }),
+      bus.on('tick', () => set('#live-vit', vitalChips())),
       bus.on('status', () => set('#live-status', statusPill())),
       bus.on('armed', () => { set('#live-status', statusPill()); set('#live-tools', tools()); }),
       bus.on('lullaby', () => { set('#live-ctl', controls()); bindTalk($('#live-ctl', root)); }),
