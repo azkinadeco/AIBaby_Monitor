@@ -1,5 +1,5 @@
 /* LAYAR KAMERA BAYI — tampil di HP yang diletakkan di kamar bayi. */
-import { $, esc, fmtTime, fmtDur, loadScript } from '../core/util.js';
+import { $, esc, fmtTime, loadScript } from '../core/util.js';
 import { ic } from '../core/icons.js';
 import { store } from '../core/store.js';
 import { bus } from '../core/bus.js';
@@ -23,10 +23,31 @@ const STATE = {
   idle: ['power', 'Belum aktif', 'muted'],
 };
 
-function parentsHtml() {
+let showPair = false;
+function pairHtml() {
   const list = [...link.parents.values()];
-  if (!list.length) return `<p class="muted small">Belum ada HP orang tua yang tersambung.</p>`;
-  return list.map(p => `<span class="chip on">${ic('phone', 13)} ${esc(p.name)} · ${fmtDur(Date.now() - p.since)}</span>`).join('');
+  const parents = list.length ? `<div class="bc-par">
+      <span class="bc-par-ic">${ic('phone', 18)}</span>
+      <span class="bc-par-t"><b>${list.map(p => esc(p.name)).join(', ')}</b><small>${list.length} HP orang tua tersambung</small></span>
+      <button class="chip-btn" data-act="bcTogglePair">${ic(showPair ? 'x' : 'plus', 14)} ${showPair ? 'Tutup' : 'Tambah'}</button></div>` : '';
+  if (list.length && !showPair) return parents;
+  const p = pairInfo();
+  return `${parents}<div class="card pair">
+    <div class="qr" id="bc-qr" aria-label="Kode QR pairing"></div>
+    <div class="pair-t">
+      <small>Pindai dari HP orang tua</small>
+      <div class="kv"><span>Kode</span><b class="code">${p.code.slice(0, 3)} ${p.code.slice(3)}</b></div>
+      <div class="kv"><span>Kunci</span><b class="code">${p.secret.slice(0, 3)} ${p.secret.slice(3)}</b></div>
+      <div class="pair-acts"><button class="btn btn-soft btn-sm" data-act="bcCopy">${ic('copy', 14)} Salin</button><button class="icon-btn sm" data-act="bcNewCode" aria-label="Buat kode baru" title="Buat kode baru">${ic('key', 16)}</button></div>
+    </div>
+  </div>`;
+}
+function drawQr(root) {
+  const box = $('#bc-qr', root); if (!box) return;
+  loadScript(QR_LIB).then(() => {
+    const qr = window.qrcode(0, 'M'); qr.addData(pairUrl()); qr.make();
+    box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+  }).catch(() => { box.innerHTML = `<small class="muted">QR butuh internet. Pakai kode di samping.</small>`; });
 }
 function statusHtml() {
   const [icn, txt, tone] = STATE[link.state] || STATE.idle;
@@ -39,7 +60,7 @@ function vitalsHtml() {
     <span class="pill">${ic('move', 13)} ${moveWord(live.motion)}</span>${l ? `<span class="pill on">${ic('music', 13)} ${l.name}</span>` : ''}`;
 }
 
-const audioNote = () => (audioReady() ? '' : `<button class="banner warn" data-act="bcWakeAudio">${ic('volumeX', 18)}<span><b>Ketuk di sini untuk mengaktifkan suara</b><small>Browser menahan mikrofon & speaker sampai layar disentuh — deteksi tangisan belum aktif.</small></span></button>`);
+const audioNote = () => (audioReady() ? '' : `<button class="banner warn" data-act="bcWakeAudio">${ic('volumeX', 18)}<span><b>Ketuk untuk aktifkan suara</b><small>Deteksi tangisan belum berjalan</small></span></button>`);
 
 route('babycam', {
   dark: true,
@@ -47,45 +68,31 @@ route('babycam', {
     if (!babyUnit.running) {
       return `${topbar('Kamera bayi')}
       <div class="stack">
-        <div class="bc-hero">${ic('cctv', 40)}<h2>Kamera bayi</h2></div>
-        <div class="card tips">
-          <div>${ic('ruler', 16)}<span>1–1,5 m dari boks</span></div>
-          <div>${ic('bolt', 16)}<span>Colokkan charger</span></div>
-          <div>${ic('moon', 16)}<span>Lampu tidur redup</span></div>
-          <div>${ic('shield', 16)}<span>Jauh dari jangkauan bayi</span></div>
+        <div class="bc-ill" aria-hidden="true">
+          <div class="wl-sky"><i></i><i></i><i></i><i></i><i></i></div>
+          <span class="bc-phone">${ic('cctv', 26)}</span><span class="bc-cone"></span><span class="bc-crib">${ic('baby', 30)}</span>
         </div>
+        <div class="bc-tips"><span>${ic('ruler', 14)} ±1 m dari boks</span><span>${ic('bolt', 14)} Dicas</span><span>${ic('moon', 14)} Lampu redup</span></div>
         <form class="form" id="bc-form">
           <label class="field"><span>Nama bayi</span><input name="name" value="${store.s.baby.demo ? '' : esc(store.s.baby.name)}" placeholder="cth. Aisyah" maxlength="20" required></label>
           <div class="field"><span>Kamera</span><div class="seg">
-            <label><input type="radio" name="facing" value="environment" ${facing === 'environment' ? 'checked' : ''}><span>Belakang (lebih jernih)</span></label>
+            <label><input type="radio" name="facing" value="environment" ${facing === 'environment' ? 'checked' : ''}><span>Belakang</span></label>
             <label><input type="radio" name="facing" value="user" ${facing === 'user' ? 'checked' : ''}><span>Depan</span></label></div></div>
           <button class="btn btn-pri btn-lg" type="submit">${ic('play', 18)} Mulai kamera</button>
         </form>
       </div>`;
     }
-    const p = pairInfo();
     return `<header class="bar"><span class="bar-sp"></span><div class="bar-t"><h1>Kamera ${esc(store.s.baby.name)}</h1><small id="bc-state">${statusHtml()}</small></div>
       <button class="icon-btn" data-act="bcDim" aria-label="Redupkan layar">${ic('moon', 20)}</button></header>
     <div class="stack">
       <div class="bc-preview" id="bc-preview"><span class="live-tag"><i></i>MENGIRIM</span></div>
       <div id="bc-audio">${audioNote()}</div>
       <div class="bc-vitals" id="bc-vitals">${vitalsHtml()}</div>
-      <div class="card pair">
-        <div class="qr" id="bc-qr" aria-label="Kode QR pairing"></div>
-        <div class="pair-t">
-          <small>Pindai dari HP orang tua</small>
-          <div class="kv"><span>Kode</span><b class="code">${p.code.slice(0, 3)} ${p.code.slice(3)}</b></div>
-          <div class="kv"><span>Kunci</span><b class="code">${p.secret.slice(0, 3)} ${p.secret.slice(3)}</b></div>
-          <button class="btn btn-soft btn-sm" data-act="bcCopy">${ic('copy', 14)} Salin tautan</button>
-        </div>
-      </div>
-      <div class="sec-h"><h3>HP orang tua</h3></div>
-      <div class="chips" id="bc-parents">${parentsHtml()}</div>
+      <div id="bc-pair">${pairHtml()}</div>
       <div class="btn-row">
         <button class="btn btn-soft" data-act="bcFlip">${ic('flip', 16)} Balik kamera</button>
         <button class="btn btn-soft danger" data-act="bcStop">${ic('power', 16)} Berhenti</button>
       </div>
-      <button class="btn btn-ghost btn-sm" data-act="bcNewCode">${ic('key', 14)} Buat kode baru (putuskan semua orang tua)</button>
     </div>`;
   },
   mount(root) {
@@ -111,22 +118,18 @@ route('babycam', {
       return null;
     }
     const feedOff = mountFeed($('#bc-preview', root));
-    loadScript(QR_LIB).then(() => {
-      const qr = window.qrcode(0, 'M'); qr.addData(pairUrl()); qr.make();
-      const box = $('#bc-qr', root); if (box) box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
-    }).catch(() => { const box = $('#bc-qr', root); if (box) box.innerHTML = `<small class="muted">QR butuh internet. Pakai kode di samping.</small>`; });
+    drawQr(root);
     const set = (id, html) => { const el = $(id, root); if (el) el.innerHTML = html; };
     const offs = [
       bus.on('link:state', () => set('#bc-state', statusHtml())),
-      bus.on('link:parents', () => { set('#bc-parents', parentsHtml()); scheduleDim(); }),
+      bus.on('link:parents', () => { if (!link.parents.size) showPair = false; set('#bc-pair', pairHtml()); drawQr(root); scheduleDim(); }),
       bus.on('tick', () => set('#bc-vitals', vitalsHtml())),
       bus.on('lullaby', () => set('#bc-vitals', vitalsHtml())),
       bus.on('gesture', () => setTimeout(() => set('#bc-audio', audioNote()), 300)),
       bus.on('babycam:cmd', m => toast(`${esc(m.from)}: ${m.a === 'lull' ? 'memutar penenang' : m.a === 'say' ? `“${esc(m.text)}”` : m.a === 'lullStop' ? 'menghentikan penenang' : 'mengatur volume'}`, { icon: 'phone' })),
     ];
-    const t = setInterval(() => set('#bc-parents', parentsHtml()), 30000);
     scheduleDim();
-    return () => { feedOff(); offs.forEach(f => f()); clearInterval(t); clearTimeout(dimTimer); undim(); };
+    return () => { feedOff(); offs.forEach(f => f()); clearTimeout(dimTimer); undim(); };
   },
 });
 
@@ -147,6 +150,7 @@ function dim() {
 function undim() { document.getElementById('dim')?.remove(); }
 
 actions.bcDim = () => dim();
+actions.bcTogglePair = () => { showPair = !showPair; const el = $('#bc-pair'); if (el) { el.innerHTML = pairHtml(); drawQr(el); } };
 actions.bcWakeAudio = () => toast('Suara aktif — deteksi tangisan berjalan', { icon: 'volume', tone: 'ok' });
 actions.bcFlip = async () => { await babyUnit.flip(); facing = localCam.facing; };
 actions.bcCopy = async () => {

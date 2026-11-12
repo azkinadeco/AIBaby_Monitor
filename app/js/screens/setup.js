@@ -1,5 +1,5 @@
 /* PEMBUKA, PEMASANGAN (pairing), PERANGKAT, dan PANEL DEMO. */
-import { $, $$, esc } from '../core/util.js';
+import { $, $$, esc, loadScript, vibrate } from '../core/util.js';
 import { ic, logo } from '../core/icons.js';
 import { store } from '../core/store.js';
 import { bus } from '../core/bus.js';
@@ -65,13 +65,16 @@ route('connect', {
     const code = (c || p.code || '').toUpperCase(), key = k || p.secret || '';
     return `${topbar('Sambungkan kamera')}
     <div class="stack">
-      <div class="steps-ill">
-        <div><span>1</span><p>HP kamera → <b>Jadikan kamera bayi</b></p></div>
-        <div><span>2</span><p>Pindai QR, atau ketik kode</p></div>
-      </div>
-      <form class="form card" id="pair-form" autocomplete="off">
-        <label class="field"><span>Kode kamera</span><input name="code" class="code-in" value="${esc(code)}" maxlength="6" placeholder="K7P2QX" required pattern="[A-Za-z0-9]{6}" autocapitalize="characters" spellcheck="false"></label>
-        <label class="field"><span>Kunci (6 angka)</span><input name="key" class="code-in" value="${esc(key)}" maxlength="6" inputmode="numeric" placeholder="••••••" required pattern="\\d{6}"></label>
+      <button class="scan-cta" data-act="scanQr">
+        <span class="scan-ic">${ic('qr', 30)}<i></i></span>
+        <span><b>Pindai QR</b><small>di layar HP kamera bayi</small></span>${ic('chevR', 18)}
+      </button>
+      <div class="or"><span>atau ketik kode</span></div>
+      <form class="form" id="pair-form" autocomplete="off">
+        <div class="pair-in">
+          <label class="field"><span>Kode</span><input name="code" class="code-in" value="${esc(code)}" maxlength="6" placeholder="K7P2QX" required pattern="[A-Za-z0-9]{6}" autocapitalize="characters" spellcheck="false"></label>
+          <label class="field"><span>Kunci</span><input name="key" class="code-in" value="${esc(key)}" maxlength="6" inputmode="numeric" placeholder="123456" required pattern="\\d{6}"></label>
+        </div>
         <label class="field"><span>Nama kamu</span><input name="name" value="${esc(store.s.parentName)}" maxlength="20" required></label>
         <div id="pair-status">${connectStatus()}</div>
         <button class="btn btn-pri btn-lg" type="submit">${ic('link', 18)} Sambungkan</button>
@@ -103,6 +106,67 @@ route('connect', {
     return off;
   },
 });
+/* ---------- Pindai QR di dalam aplikasi ----------
+   BarcodeDetector (Chrome/Android) bila ada; selain itu jsQR dari CDN. */
+const JSQR = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+function parsePair(text) {
+  try {
+    const u = new URL(text, location.href);
+    const q = new URLSearchParams((u.hash.split('?')[1]) || u.search);
+    const c = q.get('c'), k = q.get('k');
+    if (/^[A-Za-z0-9]{6}$/.test(c || '') && /^\d{6}$/.test(k || '')) return { c: c.toUpperCase(), k };
+  } catch { /* bukan URL */ }
+  return null;
+}
+actions.scanQr = () => {
+  let stream = null, raf = 0, done = false;
+  sheet(`<h3 class="sheet-title">Pindai QR</h3>
+    <div class="scan-box"><video playsinline muted></video><i class="scan-frame"></i><p class="scan-msg">Membuka kamera…</p></div>
+    <p class="muted small center">Arahkan ke QR di HP kamera bayi</p>`, {
+    onMount: root => {
+      const video = $('video', root), msg = $('.scan-msg', root);
+      const fail = t => { msg.textContent = t; msg.hidden = false; };
+      (async () => {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+          if (done) { stream.getTracks().forEach(t => t.stop()); return; }
+          video.srcObject = stream; await video.play(); msg.hidden = true;
+        } catch (e) { fail(e?.name === 'NotAllowedError' ? 'Izin kamera ditolak. Ketik kodenya saja.' : 'Kamera tidak bisa dibuka. Ketik kodenya saja.'); return; }
+        // Tiap frame digambar ke kanvas dulu — lebih andal daripada membaca <video> langsung
+        const cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+        const grab = () => {
+          const w = video.videoWidth, h = video.videoHeight; if (!w) return false;
+          const k = Math.min(1, 720 / Math.max(w, h)); cv.width = w * k; cv.height = h * k;
+          cx.drawImage(video, 0, 0, cv.width, cv.height); return true;
+        };
+        let bd = null;
+        try { if ((await window.BarcodeDetector?.getSupportedFormats())?.includes('qr_code')) bd = new window.BarcodeDetector({ formats: ['qr_code'] }); } catch { /* */ }
+        if (!bd) { try { await loadScript(JSQR); } catch { fail('Pemindai butuh internet. Ketik kodenya saja.'); return; } }
+        const detect = async () => {
+          if (!grab()) return null;
+          if (bd) return (await bd.detect(cv))[0]?.rawValue;
+          return window.jsQR(cx.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height)?.data;
+        };
+        let last = 0;
+        const loop = async t => {
+          if (done) return;
+          if (t - last > 220) {
+            last = t;
+            try {
+              const txt = await detect(); const p = txt && parsePair(txt);
+              if (p) { vibrate(30); closeSheet(); router.go(`connect?c=${p.c}&k=${p.k}`, { replace: true }); return; }
+              if (txt) { msg.textContent = 'Ini bukan QR AI Baby Monitor'; msg.hidden = false; }
+            } catch { /* frame belum siap */ }
+          }
+          raf = requestAnimationFrame(loop);
+        };
+        raf = requestAnimationFrame(loop);
+      })();
+      return () => { done = true; cancelAnimationFrame(raf); stream?.getTracks().forEach(t => t.stop()); };
+    },
+  });
+};
+
 /* Info bayi dari kamera dipakai di HP orang tua (nama untuk suara alarm, foto) */
 bus.on('link:baby', b => {
   if (!b || link.role !== 'parent') return;
@@ -125,10 +189,10 @@ route('devices', {
         <div class="kv"><span>Pencahayaan</span><b>${live.dark ? 'Gelap' : 'Terang'}</b></div>
         <div class="btn-row"><button class="btn btn-soft" data-act="reconnect">${ic('rotate', 16)} Sambung ulang</button><button class="btn btn-soft" data-go="connect">${ic('qr', 16)} Ganti kamera</button></div>
       </div>
-      ${live.dark ? `<div class="note">${ic('info', 16)} <span>Kamar gelap: gerakan lebih sulit terbaca. Nyalakan lampu tidur redup di dekat boks.</span></div>` : ''}`;
+      ${live.dark ? `<div class="note">${ic('info', 16)} <span>Kamar gelap — nyalakan lampu tidur redup agar gerakan terbaca.</span></div>` : ''}`;
     } else if (mode === 'demo') {
       body = `<div class="card">
-        <div class="set-row"><div class="set-main"><b>Pakai kamera & mic perangkat ini</b><small>Uji deteksi tangisan & gerakan sungguhan di satu perangkat</small></div>
+        <div class="set-row"><div class="set-main"><b>Pakai kamera HP ini</b><small>Uji deteksi sungguhan</small></div>
           <label class="switch"><input type="checkbox" data-act-change="toggleLocalCam" ${localCam.running ? 'checked' : ''} aria-label="Kamera perangkat ini"><i></i></label></div>
       </div>
       <button class="btn btn-soft btn-lg" data-act="demoPanel">${ic('flask', 18)} Panel simulasi</button>`;
@@ -136,13 +200,13 @@ route('devices', {
     return `${topbar('Perangkat & koneksi')}
     <div class="stack">
       ${body}
-      <div class="sec-h"><h3>Peran HP ini</h3></div>
+      <h4 class="grp">Peran HP ini</h4>
       <div class="choices">
-        ${modeCard('parent', 'phone', 'Monitor orang tua', 'Terima video & alarm dari kamera bayi')}
-        ${modeCard('baby', 'cctv', 'Kamera bayi', 'HP ini diletakkan di kamar bayi')}
-        ${modeCard('demo', 'flask', 'Mode demo', 'Bayi simulasi untuk mencoba fitur')}
+        ${modeCard('parent', 'phone', 'Monitor orang tua', 'Terima video & alarm')}
+        ${modeCard('baby', 'cctv', 'Kamera bayi', 'Diletakkan di kamar bayi')}
+        ${modeCard('demo', 'flask', 'Mode demo', 'Bayi simulasi')}
       </div>
-      <div class="note">${ic('info', 16)} <span>Agar alarm tetap berbunyi, biarkan aplikasi terbuka di HP orang tua (pakai <b>Mode tidur</b> — layar redup & tetap menyala). Browser HP membatasi suara saat aplikasi ditutup.</span></div>
+      <div class="note">${ic('info', 16)} <span>Biarkan aplikasi terbuka (<b>Mode tidur</b>) agar alarm tetap berbunyi.</span></div>
     </div>`;
   },
   mount() {
@@ -183,7 +247,7 @@ export function demoPanelHtml() {
   const sw = (key, label, on) => `<div class="set-row"><div class="set-main"><b>${label}</b></div><label class="switch"><input type="checkbox" data-demo="${key}" ${on ? 'checked' : ''}><i></i></label></div>`;
   return `<div class="demo-panel">
     <h3 class="sheet-title">${ic('flask', 20)} Panel simulasi</h3>
-    <p class="muted small">Ubah kondisi bayi simulasi untuk mencoba alarm & fitur.${localCam.running ? ' <b>Kamera asli sedang aktif — matikan untuk memakai bayi simulasi.</b>' : ''}</p>
+    <p class="muted small">Ubah kondisi bayi simulasi.${localCam.running ? ' <b>Kamera asli sedang aktif — matikan untuk memakai bayi simulasi.</b>' : ''}</p>
     <div class="sim-grid">${Object.entries(SIM_STATES).map(([k, v]) => `<button class="sim-btn tone-${v.tone} ${sim.state === k ? 'on' : ''}" data-act="simSet" data-k="${k}">${ic(v.icon, 18)}<span>${v.label}</span></button>`).join('')}</div>
     <div class="card flat">
       ${sw('camOnline', 'Kamera online', sim.camOnline)}

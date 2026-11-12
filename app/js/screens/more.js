@@ -227,7 +227,7 @@ route('help', {
     }
     const faq = [
       ['Apa saja yang dibutuhkan?', 'Dua perangkat dengan browser modern (Chrome/Safari): satu jadi <b>kamera bayi</b> (HP lama pun bisa), satu jadi <b>monitor orang tua</b>. Keduanya butuh internet saat pertama tersambung; untuk hasil terbaik gunakan Wi-Fi yang sama.'],
-      ['Bagaimana menyambungkan?', 'Di HP kamera pilih <b>Jadikan HP ini kamera bayi</b> → Mulai kamera. Di HP orang tua pindai QR yang muncul (pakai aplikasi kamera bawaan) atau masukkan kode & kunci 6 angka.'],
+      ['Bagaimana menyambungkan?', 'HP kamera: pilih <b>Kamera</b> → Mulai kamera. HP orang tua: pilih <b>Monitor</b> → <b>Pindai QR</b>, atau ketik kode & kunci.'],
       ['Apa yang bisa dideteksi?', 'Tangisan (suara keras di frekuensi tangisan bayi yang bertahan beberapa detik), gelisah/terbangun (gerakan pada gambar), dan sambungan kamera terputus. Deteksi tengkurap/muntah/napas butuh model AI khusus dan baru tersedia di mode demo.'],
       ['Apakah alarm berbunyi saat HP terkunci?', 'Browser HP membatasi suara saat aplikasi ditutup atau layar terkunci. Gunakan <b>Mode tidur</b>: layar dibuat hampir hitam namun tetap menyala, sehingga alarm pasti terdengar. Colokkan pengisi daya.'],
       ['Apakah video saya aman?', 'Video & suara mengalir langsung antar-HP (WebRTC, terenkripsi). Server hanya dipakai untuk memperkenalkan kedua HP. Orang tanpa kunci 6 angka akan ditolak. Tidak ada video yang disimpan di server.'],

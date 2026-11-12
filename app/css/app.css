@@ -473,11 +473,6 @@ button:active:not(:disabled) { transform: scale(.96); }
 .choice.on > .ic:last-child { color: var(--ok); }
 .choice.ghost { background: transparent; box-shadow: none; border-style: dashed; }
 .choice-ic { width: 46px; height: 46px; border-radius: 15px; display: grid; place-items: center; flex-shrink: 0; color: var(--c, var(--muted)); background: color-mix(in srgb, var(--c, var(--muted)) 14%, transparent); }
-.steps-ill { display: flex; flex-direction: column; gap: 10px; }
-.steps-ill > div { display: flex; gap: 12px; align-items: flex-start; }
-.steps-ill span { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: var(--pri); color: var(--pri-ink); font-weight: 800; font-size: 13px; }
-.steps-ill p { color: var(--muted); font-size: 14px; padding-top: 3px; }
-.steps-ill b { color: var(--text); }
 .dev { display: flex; flex-direction: column; gap: 4px; }
 .dev-h { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
 .dev-h b { display: block; }
@@ -493,12 +488,6 @@ button:active:not(:disabled) { transform: scale(.96); }
 .side .sheet-title { margin-top: 0; }
 
 /* =========================== KAMERA BAYI =========================== */
-.bc-hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 0 4px; color: var(--accent); }
-.bc-hero h2 { color: var(--text); font-size: 26px; }
-.bc-hero p { color: var(--muted); }
-.tips { display: flex; flex-direction: column; gap: 12px; }
-.tips > div { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; }
-.tips .ic { color: var(--accent); margin-top: 2px; }
 .bc-preview { position: relative; aspect-ratio: 4 / 3; border-radius: var(--r); overflow: hidden; background: #000; }
 .bc-preview .live-tag i { background: var(--ok); }
 .bc-vitals { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -666,5 +655,41 @@ body.night-on .tabbar { display: none; }
 .mt-dot { position: absolute; top: -2px; right: -2px; width: 11px; height: 11px; border-radius: 50%; background: var(--faint); box-shadow: 0 0 0 2px var(--bg-2); }
 .mt-dot.on { background: var(--ok); }
 .set-ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: var(--muted); background: var(--bg-3); flex-shrink: 0; }
-.tips { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.tips > div { align-items: center; font-size: 13px; font-weight: 600; }
+
+/* ---------- Sambungkan: pindai QR ---------- */
+.scan-cta { display: flex; align-items: center; gap: 16px; padding: 18px; border-radius: 26px; text-align: left; color: #fff; background: linear-gradient(150deg, var(--pri), #5B4BD6); box-shadow: 0 18px 38px -16px var(--pri); transition: transform .15s; }
+.scan-cta:active { transform: scale(.98); }
+.scan-cta > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; }
+.scan-cta b { font: 600 22px/1.15 var(--display); }
+.scan-cta small { opacity: .8; font-weight: 600; }
+.scan-ic { position: relative; width: 62px; height: 62px; border-radius: 20px; display: grid; place-items: center; overflow: hidden; background: rgba(255, 255, 255, .16); }
+.scan-ic i { position: absolute; left: 10px; right: 10px; height: 2px; border-radius: 2px; background: #FFD9A0; box-shadow: 0 0 10px #FFD9A0; animation: scanline 2s ease-in-out infinite; }
+@keyframes scanline { 0%, 100% { top: 14px; } 50% { top: 46px; } }
+.or { display: flex; align-items: center; gap: 12px; color: var(--faint); font-size: 12.5px; font-weight: 700; }
+.or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.pair-in { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pair-in .code-in { font-size: 19px !important; letter-spacing: .14em; padding-left: 6px; padding-right: 6px; }
+.scan-box { position: relative; aspect-ratio: 1; border-radius: 24px; overflow: hidden; background: #000; margin: 4px 0 12px; }
+.scan-box video { width: 100%; height: 100%; object-fit: cover; }
+.scan-frame { position: absolute; inset: 18%; border-radius: 22px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .45); border: 3px solid rgba(255, 255, 255, .9); }
+.scan-frame::after { content: ''; position: absolute; left: 8%; right: 8%; height: 2px; background: #FFD9A0; box-shadow: 0 0 12px #FFD9A0; animation: scanline2 2.2s ease-in-out infinite; }
+@keyframes scanline2 { 0%, 100% { top: 10%; } 50% { top: 88%; } }
+.scan-msg { position: absolute; left: 12px; right: 12px; bottom: 12px; text-align: center; color: #fff; font-size: 13px; font-weight: 700; background: rgba(0, 0, 0, .55); padding: 8px 10px; border-radius: 12px; }
+
+/* ---------- Kamera bayi ---------- */
+.bc-ill { position: relative; height: 170px; border-radius: 28px; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 0;
+  background: radial-gradient(120% 90% at 50% 0%, #2B2560 0%, #15132E 70%); }
+.bc-phone { position: relative; z-index: 1; width: 54px; height: 84px; border-radius: 16px; display: grid; place-items: center; color: #FFD9A0; background: linear-gradient(160deg, rgba(255, 255, 255, .18), rgba(255, 255, 255, .05)); border: 1.5px solid rgba(255, 255, 255, .25); animation: floaty 5s ease-in-out infinite; }
+.bc-cone { width: 86px; height: 70px; margin: 0 -6px; clip-path: polygon(0 42%, 100% 0, 100% 100%, 0 58%); background: linear-gradient(90deg, rgba(255, 217, 160, .45), rgba(255, 217, 160, .04)); animation: twinkle 3.5s ease-in-out infinite; }
+.bc-crib { width: 78px; height: 78px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: linear-gradient(160deg, var(--pri), #5B4BD6); box-shadow: 0 16px 34px -12px rgba(139, 124, 246, .7); }
+.bc-tips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.bc-tips span { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--line); font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.bc-tips .ic { color: var(--accent); }
+#bc-pair { display: flex; flex-direction: column; gap: 10px; }
+.bc-par { display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; border-radius: 20px; background: var(--bg-2); border: 1px solid var(--line); }
+.bc-par-ic { width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); flex-shrink: 0; }
+.bc-par-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bc-par-t b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bc-par-t small { color: var(--muted); }
+.pair-acts { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.pair-acts .btn { margin-top: 0 !important; }
