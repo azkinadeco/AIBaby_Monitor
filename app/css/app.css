@@ -693,3 +693,5 @@ body.night-on .tabbar { display: none; }
 .bc-par-t small { color: var(--muted); }
 .pair-acts { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
 .pair-acts .btn { margin-top: 0 !important; }
+.night-x { position: absolute; top: calc(16px + env(safe-area-inset-top)); left: 16px; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #6E6A8E; background: #0E0D1C; transition: opacity .6s; }
+.night.deep .night-x { opacity: 0; }

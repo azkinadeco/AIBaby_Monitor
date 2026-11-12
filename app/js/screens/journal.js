@@ -231,8 +231,8 @@ route('event', {
     const pend = !e.ack && e.level !== 'info';
     const m = e.metrics || {};
     return topbar(levelLabel(e.level)) + `<div class="stack">
-      <div class="snap" id="ev-media">${e.snap ? `<img src="${e.snap}" alt="Cuplikan kamera saat kejadian">` : `<div class="snap-ph">${ic('cctv', 36)}<small>Tidak ada cuplikan</small></div>`}
-        ${e.clip ? `<span class="clip-tag">${ic('video', 12)} Klip tersedia</span>` : ''}</div>
+      ${e.snap || e.clip ? `<div class="snap" id="ev-media">${e.snap ? `<img src="${e.snap}" alt="Cuplikan kamera saat kejadian">` : `<div class="snap-ph">${ic('video', 32)}</div>`}
+        ${e.clip ? `<span class="clip-tag">${ic('video', 12)} Klip tersedia</span>` : ''}</div>` : ''}
       <div class="ev-title"><span class="row-ic lg tone-${levelTone(e.level)}">${ic(T.icon, 22)}</span><div><h2>${T.label}</h2><small>${fmtDay(e.ts)} · ${fmtTime(e.ts)}</small></div></div>
       <p class="muted">${DESC[e.type] || ''}</p>
       ${e.metrics ? `<div class="chips">

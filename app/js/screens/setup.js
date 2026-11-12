@@ -6,7 +6,7 @@ import { bus } from '../core/bus.js';
 import { route, router } from '../core/router.js';
 import { actions, sheet, closeSheet, toast, confirmBox, topbar } from '../core/ui.js';
 import { link } from '../services/link.js';
-import { live, localCam, STATUS } from '../services/monitor.js';
+import { live, localCam } from '../services/monitor.js';
 import { sim, SIM_STATES, autoDemo } from '../services/sim.js';
 import { babyUnit } from '../services/babyUnit.js';
 import { applyListen } from '../services/control.js';
@@ -254,7 +254,6 @@ export function demoPanelHtml() {
       ${sw('hotRoom', 'Kamar panas (>29°C)', sim.hotRoom)}
       ${sw('auto', 'Demo otomatis', autoDemo.on)}
     </div>
-    <p class="fine">Status sekarang: <b>${STATUS[live.status]?.text || '-'}</b></p>
     <button class="btn btn-soft" data-act="resetDemo">${ic('rotate', 16)} Reset semua data</button>
   </div>`;
 }

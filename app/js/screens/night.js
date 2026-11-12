@@ -20,12 +20,13 @@ route('night', {
   dark: true,
   render() {
     return `<div class="night" id="night">
+      <button class="night-x" data-act="back" aria-label="Keluar mode tidur">${ic('x', 22)}</button>
       <div class="night-clock" id="n-clock">${fmtTime(Date.now())}</div>
       <div class="night-line" id="n-line">${line()}</div>
       <div class="night-level"><i id="n-level"></i></div>
       <div class="night-foot">
         <button class="pill ${store.s.listen ? 'on' : ''}" id="n-listen">${ic(store.s.listen ? 'volume' : 'volumeX', 14)} ${store.s.listen ? 'Mendengarkan' : 'Dengarkan kamar'}</button>
-        <small>${WakeLock.supported ? 'Layar tetap menyala · ' : ''}ketuk dua kali untuk keluar</small>
+        <small>${WakeLock.supported ? 'Layar tetap menyala' : 'Jangan kunci layar'}</small>
       </div>
     </div>`;
   },
