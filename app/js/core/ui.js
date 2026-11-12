@@ -44,16 +44,19 @@ actions.back = () => router.back();
 actions.closeSheet = () => closeSheet();
 
 /* ---------------- Toast ---------------- */
-export function toast(msg, { icon = 'checkCircle', tone = '', ms = 2600 } = {}) {
+/** action = { label, fn } → tombol kecil di toast (mis. "Urungkan") */
+export function toast(msg, { icon = 'checkCircle', tone = '', ms = 2600, action = null } = {}) {
   const root = $('#toast-root');
   const el = document.createElement('div');
   el.className = `toast ${tone ? 't-' + tone : ''}`;
   el.setAttribute('role', 'status');
-  el.innerHTML = `${ic(icon, 18)}<span>${msg}</span>`;
+  el.innerHTML = `${ic(icon, 18)}<span>${msg}</span>${action ? `<button class="toast-act">${esc(action.label)}</button>` : ''}`;
+  const hide = () => { el.classList.remove('in'); setTimeout(() => el.remove(), 300); };
+  if (action) el.querySelector('.toast-act').onclick = () => { action.fn(); hide(); };
   root.appendChild(el);
   while (root.children.length > 3) root.firstChild.remove();
   requestAnimationFrame(() => el.classList.add('in'));
-  setTimeout(() => { el.classList.remove('in'); setTimeout(() => el.remove(), 300); }, ms);
+  setTimeout(hide, action ? Math.max(ms, 5000) : ms);
 }
 
 /* ---------------- Bottom sheet ---------------- */
@@ -66,9 +69,32 @@ export function sheet(html, { onMount, cls = '' } = {}) {
     <div class="sheet ${cls}" role="dialog" aria-modal="true"><div class="sheet-grip"></div>${html}</div>`;
   $('#overlay-root').appendChild(el);
   requestAnimationFrame(() => el.classList.add('in'));
+  dragToClose(el.querySelector('.sheet'));
   sheetCleanup = onMount?.(el) || null;
   return el;
 }
+/** Tarik sheet ke bawah (dari pegangan / bagian atas) untuk menutup */
+function dragToClose(sh) {
+  let y0 = null, dy = 0;
+  sh.addEventListener('pointerdown', e => {
+    const top = e.clientY - sh.getBoundingClientRect().top;
+    if (top > 56 || e.target.closest('input, select, textarea, button, [data-talk]')) return;
+    y0 = e.clientY; dy = 0; sh.style.transition = 'none'; sh.setPointerCapture(e.pointerId);
+  });
+  sh.addEventListener('pointermove', e => {
+    if (y0 == null) return;
+    dy = Math.max(0, e.clientY - y0);
+    sh.style.transform = `translateY(${dy}px)`;
+  });
+  const end = () => {
+    if (y0 == null) return;
+    y0 = null; sh.style.transition = ''; sh.style.transform = '';
+    if (dy > 90) closeSheet();
+  };
+  sh.addEventListener('pointerup', end);
+  sh.addEventListener('pointercancel', end);
+}
+
 export function closeSheet(instant = false) {
   try { sheetCleanup?.(); } catch { /* */ }
   sheetCleanup = null;

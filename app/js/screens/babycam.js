@@ -47,12 +47,12 @@ route('babycam', {
     if (!babyUnit.running) {
       return `${topbar('Kamera bayi')}
       <div class="stack">
-        <div class="bc-hero">${ic('cctv', 40)}<h2>Jadikan HP ini kamera bayi</h2><p>HP ini akan mengirim video, suara, dan deteksi tangisan/gerakan ke HP orang tua.</p></div>
+        <div class="bc-hero">${ic('cctv', 40)}<h2>Kamera bayi</h2></div>
         <div class="card tips">
-          <div>${ic('ruler', 16)}<span>Letakkan 1–1,5 m dari boks, mengarah ke kasur bayi.</span></div>
-          <div>${ic('bolt', 16)}<span>Colokkan pengisi daya — kamera menyala sepanjang malam.</span></div>
-          <div>${ic('moon', 16)}<span>Nyalakan lampu tidur redup agar gerakan tetap terbaca.</span></div>
-          <div>${ic('shield', 16)}<span>Pastikan HP & kabel di luar jangkauan bayi.</span></div>
+          <div>${ic('ruler', 16)}<span>1–1,5 m dari boks</span></div>
+          <div>${ic('bolt', 16)}<span>Colokkan charger</span></div>
+          <div>${ic('moon', 16)}<span>Lampu tidur redup</span></div>
+          <div>${ic('shield', 16)}<span>Jauh dari jangkauan bayi</span></div>
         </div>
         <form class="form" id="bc-form">
           <label class="field"><span>Nama bayi</span><input name="name" value="${store.s.baby.demo ? '' : esc(store.s.baby.name)}" placeholder="cth. Aisyah" maxlength="20" required></label>
@@ -61,7 +61,6 @@ route('babycam', {
             <label><input type="radio" name="facing" value="user" ${facing === 'user' ? 'checked' : ''}><span>Depan</span></label></div></div>
           <button class="btn btn-pri btn-lg" type="submit">${ic('play', 18)} Mulai kamera</button>
         </form>
-        <p class="fine center">Izinkan akses kamera & mikrofon saat diminta. Video tidak disimpan di server mana pun.</p>
       </div>`;
     }
     const p = pairInfo();
@@ -74,7 +73,7 @@ route('babycam', {
       <div class="card pair">
         <div class="qr" id="bc-qr" aria-label="Kode QR pairing"></div>
         <div class="pair-t">
-          <small>Pindai dengan HP orang tua, atau masukkan:</small>
+          <small>Pindai dari HP orang tua</small>
           <div class="kv"><span>Kode</span><b class="code">${p.code.slice(0, 3)} ${p.code.slice(3)}</b></div>
           <div class="kv"><span>Kunci</span><b class="code">${p.secret.slice(0, 3)} ${p.secret.slice(3)}</b></div>
           <button class="btn btn-soft btn-sm" data-act="bcCopy">${ic('copy', 14)} Salin tautan</button>

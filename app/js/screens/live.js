@@ -23,21 +23,23 @@ function detChips() {
   const D = store.s.settings.detect, real = live.source !== 'sim';
   const keys = real ? ['cry', 'motion', 'wake'] : ['cry', 'motion', 'wake', 'position', 'vomit', 'breath'];
   const hit = STATUS_DET[live.status];
-  return keys.map(k => `<span class="det ${D[k].on ? '' : 'off'} ${hit === k ? 'hit' : ''}">${ic(TYPES[k].icon, 14)}${TYPES[k].short}</span>`).join('');
+  return keys.map(k => `<span class="det ${D[k].on ? '' : 'off'} ${hit === k ? 'hit' : ''}" title="${TYPES[k].short}" aria-label="${TYPES[k].short}">${ic(TYPES[k].icon, 16)}</span>`).join('');
 }
 function controls() {
   const l = control.lullState(), listen = store.s.listen;
-  return `<button class="lc ${listen ? 'on' : ''}" data-act="liveListen"><span>${ic(listen ? 'volume' : 'volumeX', 22)}</span><small>${listen ? 'Mendengar' : 'Dengar'}</small></button>
+  return `<button class="lc ${listen ? 'on' : ''}" data-act="liveListen"><span>${ic(listen ? 'volume' : 'volumeX', 22)}</span><small>Dengar</small></button>
     ${talkButtonHtml(true)}
-    <button class="lc ${l.on ? 'on' : ''}" data-act="lullaby"><span>${ic('music', 22)}</span><small>${l.on ? 'Diputar' : 'Penenang'}</small></button>`;
+    <button class="lc ${l.on ? 'on' : ''}" data-act="lullaby"><span>${ic('music', 22)}</span><small>Lagu</small></button>`;
 }
 function tools() {
-  const t = (act, icon, label, on = false) => `<button class="tool ${on ? 'on' : ''}" data-act="${act}">${ic(icon, 18)}<span>${label}</span></button>`;
+  const t = (act, icon, label, on = false) => `<button class="tool ${on ? 'on' : ''}" data-act="${act}" title="${label}" aria-label="${label}">${ic(icon, 20)}</button>`;
   return t('livePhoto', 'camera', 'Foto')
-    + t('liveRec', 'record', rec ? 'Stop' : 'Rekam', !!rec)
+    + t('liveRec', rec ? 'stop' : 'record', rec ? 'Stop rekam' : 'Rekam', !!rec)
     + (live.source === 'sim' ? t('liveNight', 'moon', 'Inframerah', simCam.night) : '')
-    + (live.source === 'local' ? t('liveFlip', 'flip', 'Balik') : '')
-    + t('liveArm', store.s.armed === false ? 'play' : 'pause', store.s.armed === false ? 'Aktifkan AI' : 'Jeda AI', store.s.armed === false);
+    + (live.source === 'local' ? t('liveFlip', 'flip', 'Balik kamera') : '')
+    + t('liveArm', store.s.armed === false ? 'play' : 'pause', store.s.armed === false ? 'Aktifkan AI' : 'Jeda AI', store.s.armed === false)
+    + t('livePip', 'copy', 'Jendela mengambang')
+    + t('liveFull', 'maximize', 'Layar penuh');
 }
 
 route('live', {
@@ -48,23 +50,19 @@ route('live', {
     return `
     <header class="bar">
       <span class="bar-sp"></span>
-      <div class="bar-t"><h1>${cam}</h1><small class="tone-${L.tone}" id="live-link">${ic(L.icon, 12)} ${L.text}</small></div>
+      <div class="bar-t"><h1>${cam} <span class="tone-${L.tone} link-ic" id="live-link" title="${L.text}">${ic(L.icon, 14)}</span></h1></div>
       <button class="icon-btn" data-go="devices" aria-label="Perangkat">${ic('settings', 20)}</button>
     </header>
     <div class="live-view" id="live-view">
       <div class="lv-top"><span class="live-tag"><i></i>LIVE</span>${rec ? `<span class="rec-tag"><i></i><span id="rec-time">00:00</span></span>` : ''}</div>
-      <div class="lv-nosig">${ic('wifiOff', 30)}<b>Menunggu gambar…</b><small>${store.s.mode === 'parent' ? 'Pastikan aplikasi di HP kamera bayi tetap terbuka.' : 'Kamera belum aktif.'}</small></div>
+      <div class="lv-nosig">${ic('wifiOff', 30)}<b>Menunggu gambar…</b></div>
       <div class="lv-status" id="live-status">${statusPill()}</div>
-      <div class="lv-corner">
-        <button class="lv-btn" data-act="livePip" aria-label="Jendela mengambang">${ic('copy', 17)}</button>
-        <button class="lv-btn" data-act="liveFull" aria-label="Layar penuh">${ic('maximize', 17)}</button>
-      </div>
     </div>
     <div class="live-ctl" id="live-ctl">${controls()}</div>
     <div class="tools" id="live-tools">${tools()}</div>
     <div class="meters">
-      <div class="meter-row"><div><small>${ic('volume', 13)} Suara</small><b id="m-sound">${soundWord(live.level, live.cry)}</b></div><canvas class="spark" id="sp-sound"></canvas></div>
-      <div class="meter-row"><div><small>${ic('move', 13)} Gerakan</small><b id="m-move">${moveWord(live.motion)}</b></div><canvas class="spark" id="sp-move"></canvas></div>
+      <div class="meter-row"><span class="m-ic tone-accent">${ic('volume', 16)}</span><canvas class="spark" id="sp-sound"></canvas><b id="m-sound">${soundWord(live.level, live.cry)}</b></div>
+      <div class="meter-row"><span class="m-ic tone-pri">${ic('move', 16)}</span><canvas class="spark" id="sp-move"></canvas><b id="m-move">${moveWord(live.motion)}</b></div>
       <div class="dets" id="live-dets">${detChips()}</div>
     </div>`;
   },
@@ -87,7 +85,7 @@ route('live', {
       bus.on('armed', () => { set('#live-status', statusPill()); set('#live-tools', tools()); }),
       bus.on('lullaby', () => { set('#live-ctl', controls()); bindTalk($('#live-ctl', root)); }),
       bus.on('listen', () => { set('#live-ctl', controls()); bindTalk($('#live-ctl', root)); }),
-      bus.on('link:state', () => { const L = linkLabel(), el = $('#live-link', root); if (el) { el.className = 'tone-' + L.tone; el.innerHTML = `${ic(L.icon, 12)} ${L.text}`; } }),
+      bus.on('link:state', () => { const L = linkLabel(), el = $('#live-link', root); if (el) { el.className = `tone-${L.tone} link-ic`; el.title = L.text; el.innerHTML = ic(L.icon, 14); } }),
     ];
     const recT = setInterval(() => {
       const el = $('#rec-time', root);

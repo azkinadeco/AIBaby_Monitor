@@ -1,5 +1,5 @@
-/* BERANDA — sekali lihat langsung tahu: bayi sedang apa, sejak kapan, dan apakah semua aman. */
-import { $, esc, fmtAgo, fmtDur, babyAge, HOUR } from '../core/util.js';
+/* BERANDA — satu layar, sedikit tulisan: kamera + status, 3 indikator, tombol cepat, dan kotak ringkas. */
+import { $, $$, esc, fmtDur, fmtTime, babyAge, HOUR } from '../core/util.js';
 import { ic } from '../core/icons.js';
 import { store } from '../core/store.js';
 import { bus } from '../core/bus.js';
@@ -8,128 +8,121 @@ import { babyAvatar } from '../core/ui.js';
 import { live, sleptBetween } from '../services/monitor.js';
 import { mountFeed } from '../services/feed.js';
 import { control } from '../services/control.js';
-import { TRACKS } from '../services/audio.js';
-import { nightCardHtml, wakeCardHtml, nextFeedText } from './report.js';
-import { statusNow, soundWord, moveWord, eventRow, timeline24, lastCare, linkLabel, sinceText } from './shared.js';
+import { wakeWindow, nextFeed, nightReport } from '../services/insights.js';
+import { statusNow, soundWord, moveWord, timeline24, lastCare, linkLabel, sinceText } from './shared.js';
 
-function hero() {
-  const S = statusNow(), L = linkLabel();
-  const breath = live.rpm ? (60 / live.rpm) * 2 : 5;
-  const sub = ['offline', 'waiting', 'paused'].includes(S.key)
-    ? (S.key === 'paused' ? 'Alarm otomatis tidak aktif' : store.s.mode === 'parent' ? 'Pastikan HP kamera bayi menyala & tersambung internet' : 'Kamera tidak mengirim gambar')
-    : sinceText().text;
-  return `<div class="orb tone-${S.tone}" style="--breath:${breath.toFixed(1)}s"><i></i><i></i><i></i><span class="orb-core">${ic(S.icon, 34)}</span></div>
-    <h1 class="hero-status">${S.text}</h1>
-    <p class="hero-sub" data-b="since">${sub}</p>
-    ${store.s.mode === 'demo' ? '' : `<button class="pill tone-${L.tone}" data-go="devices">${ic(L.icon, 14)} ${L.text}</button>`}`;
+const WAVE = 28;
+/** "baru" untuk < 1 menit, selain itu durasi singkat (1j 18m) */
+const ago = ts => (Date.now() - ts < 60000 ? 'baru' : fmtDur(Date.now() - ts));
+const R = 21, RC = 2 * Math.PI * R;
+
+/* ---------- Status melayang di atas video ---------- */
+function statusPill() {
+  const S = statusNow();
+  const bad = ['offline', 'waiting', 'paused'].includes(S.key);
+  const sub = bad ? (S.key === 'paused' ? 'AI dijeda' : linkLabel().text) : fmtDur(Date.now() - sinceText().from);
+  let hint = '';
+  if (S.key === 'awake' || S.key === 'active') {
+    const w = wakeWindow();
+    if (w.from) hint = `<span class="hc-hint">${ic('moon', 12)} ${Date.now() < w.from ? fmtTime(w.from) : 'waktunya tidur'}</span>`;
+  }
+  return `<span class="hc-status tone-${S.tone}"><span class="hc-ic">${ic(S.icon, 18)}</span><b>${S.text}</b><small data-b="since">${sub}</small></span>${hint}`;
 }
 
-function conditions() {
+/* ---------- 3 cincin indikator ---------- */
+function ring(icon, word, pct, tone) {
+  const p = Math.max(.04, Math.min(1, pct));
+  return `<div class="vit tone-${tone}">
+    <span class="vit-ring"><svg class="vr" viewBox="0 0 50 50"><circle cx="25" cy="25" r="${R}" class="vr-bg"/><circle cx="25" cy="25" r="${R}" class="vr-fg" stroke-dasharray="${(RC * p).toFixed(1)} ${RC.toFixed(1)}"/></svg>${ic(icon, 18)}</span>
+    <b>${word}</b></div>`;
+}
+function vitals() {
   const third = live.rpm != null
-    ? { icon: 'wind', label: 'Napas', val: `${Math.round(live.rpm)}<small>/mnt</small>`, tone: live.rpm >= 60 || live.rpm <= 18 ? 'bad' : 'ok', pct: live.rpm / 80 }
+    ? ring('wind', `${Math.round(live.rpm)}<small>/mnt</small>`, live.rpm / 80, live.rpm >= 60 || live.rpm <= 18 ? 'bad' : 'ok')
     : live.bat != null
-      ? { icon: live.bat < .2 ? 'batteryLow' : 'battery', label: 'Baterai kamera', val: `${Math.round(live.bat * 100)}<small>%</small>`, tone: live.bat < .2 && !live.charging ? 'bad' : 'ok', pct: live.bat }
-      : { icon: 'activity', label: 'Respons', val: live.latency != null ? `${live.latency}<small>ms</small>` : '–', tone: 'ok', pct: .2 };
-  const cryTone = live.cry >= .35 || live.level >= 62 ? 'warn' : 'ok';
-  const movTone = live.motion >= 50 ? 'warn' : 'ok';
-  const tile = (icon, label, val, tone, pct) => `<div class="cond tone-${tone}">
-    <span class="cond-ic">${ic(icon, 16)}</span><small>${label}</small><b>${val}</b>
-    <span class="meter"><i style="width:${Math.round(Math.min(1, Math.max(.03, pct)) * 100)}%"></i></span></div>`;
-  return tile('volume', 'Suara', soundWord(live.level, live.cry), cryTone, live.level / 100)
-    + tile('move', 'Gerakan', moveWord(live.motion), movTone, live.motion / 100)
-    + tile(third.icon, third.label, third.val, third.tone, third.pct);
+      ? ring(live.bat < .2 ? 'batteryLow' : 'battery', `${Math.round(live.bat * 100)}%`, live.bat, live.bat < .2 && !live.charging ? 'bad' : 'ok')
+      : ring('wifi', live.latency != null ? `${live.latency}<small>ms</small>` : '–', .3, 'ok');
+  return ring('volume', soundWord(live.level, live.cry), live.level / 100, live.cry >= .35 || live.level >= 62 ? 'warn' : 'ok')
+    + ring('move', moveWord(live.motion), live.motion / 100, live.motion >= 50 ? 'warn' : 'ok')
+    + third;
 }
 
-function quickActions() {
+/* ---------- Tombol cepat ---------- */
+function dock() {
   const l = control.lullState();
-  const btn = (act, icon, label, on = false, extra = '') => `<button class="qa ${on ? 'on' : ''}" ${act.startsWith('go:') ? `data-go="${act.slice(3)}"` : `data-act="${act}"`} ${extra}><span>${ic(icon, 22)}${on ? '<i class="qa-eq"></i>' : ''}</span><small>${label}</small></button>`;
-  return btn('lullaby', 'music', l.on ? (TRACKS[l.track]?.name.split(' ')[0] || 'Diputar') : 'Penenang', l.on)
-    + btn('talk', 'mic', 'Bicara')
-    + btn('go:night', 'moonStar', 'Mode tidur')
-    + btn('care', 'plus', 'Catat');
+  const b = (attr, icon, label, on = false) => `<button class="dk ${on ? 'on' : ''}" ${attr}><span>${ic(icon, 22)}${on ? '<span class="eq"><i></i><i></i><i></i></span>' : ''}</span><small>${label}</small></button>`;
+  return b('data-act="lullaby"', 'music', l.on ? 'Diputar' : 'Lagu', l.on)
+    + b('data-act="talk"', 'mic', 'Bicara')
+    + b('data-go="night"', 'moonStar', 'Tidur')
+    + b('data-act="care"', 'plus', 'Catat');
 }
 
-function careCard() {
-  const m = lastCare('milk'), d = lastCare('diaper');
-  const item = (c, t, icon, label) => `<div class="care-item">
-    <span class="care-ic tone-${t === 'milk' ? 'pri' : 'info'}">${ic(icon, 18)}</span>
-    <span class="care-t"><small>${label}</small><b>${c ? fmtAgo(c.ts) : 'Belum dicatat'}</b>${c ? `<small>${esc(c.detail)}${t === 'milk' ? ` · ${nextFeedText()}` : ''}</small>` : ''}</span>
-    <button class="icon-btn soft sm" data-act="quickCare" data-t="${t}" aria-label="Catat ${label}">${ic('plus', 18)}</button>
-  </div>`;
-  return item(m, 'milk', 'bottle', 'Susu terakhir') + item(d, 'diaper', 'diaper', 'Popok terakhir');
-}
-
-function sleepCard() {
-  const total = sleptBetween(Date.now() - 24 * HOUR);
-  const day0 = new Date(); day0.setHours(0, 0, 0, 0);
-  return `<div class="card-h"><b>${ic('moon', 16)} Tidur 24 jam terakhir</b><span class="big-num">${fmtDur(total)}</span></div>
-    ${timeline24()}
-    <div class="legend"><span><i class="lg-sleep"></i>Tidur</span><span><i class="lg-warn"></i>Peringatan</span><span>Hari ini: <b>${fmtDur(sleptBetween(day0.getTime()))}</b></span></div>`;
-}
-
-function recentEvents() {
-  const list = store.s.events.filter(e => e.level !== 'info').slice(0, 3);
-  return list.length ? list.map(eventRow).join('') : `<p class="muted small pad-s">Belum ada peringatan. Semua tenang.</p>`;
+/* ---------- Kotak bento ---------- */
+function bento() {
+  const m = lastCare('milk'), d = lastCare('diaper'), f = nextFeed();
+  const unread = store.unread(), r = nightReport();
+  const care = (t, c, icon, label, sub) => `<button class="bt bt-care tone-${t === 'milk' ? 'pri' : 'info'}" data-act="quickCare" data-t="${t}" aria-label="Catat ${label}">
+    <span class="bt-ic">${ic(icon, 20)}</span><span class="bt-plus">${ic('plus', 14)}</span>
+    <b>${c ? ago(c.ts) : '–'}</b><small>${sub || label}</small></button>`;
+  const feedSub = f ? (f.due ? '<em class="tone-warn">waktunya!</em>' : `→ ${fmtTime(f.at)}`) : 'Susu';
+  return care('milk', m, 'bottle', 'Susu', m ? feedSub : 'Susu')
+    + care('diaper', d, 'diaper', 'Popok', 'Popok')
+    + `<button class="bt bt-wide" data-go="journal?tab=sleep">
+        <span class="bt-row"><span class="bt-ic tone-ok">${ic('moon', 18)}</span><b>${fmtDur(sleptBetween(Date.now() - 24 * HOUR))}</b><small>24 jam</small></span>
+        ${timeline24({ labels: false })}</button>`
+    + `<button class="bt" data-go="report"><span class="bt-ic tone-accent">${ic('moonStar', 20)}</span><b>${r.hasData ? fmtDur(r.total) : '–'}</b><small>Semalam</small></button>`
+    + `<button class="bt ${unread ? 'alert' : ''}" data-go="journal"><span class="bt-ic tone-${unread ? 'bad' : 'ok'}">${ic(unread ? 'bell' : 'shield', 20)}</span><b>${unread || 'Aman'}</b><small>${unread ? 'belum dicek' : 'Peringatan'}</small></button>`;
 }
 
 route('home', {
   tab: 'home',
   render() {
-    const s = store.s, unread = store.unread();
-    const banner = s.mode === 'demo'
-      ? `<button class="banner" data-go="welcome">${ic('flask', 18)}<span><b>Mode demo · bayi simulasi</b><small>Siap pakai sungguhan? Sambungkan 2 HP</small></span>${ic('chevR', 18)}</button>`
-      : s.mode === 'parent' && !s.pair.code ? `<button class="banner" data-go="connect">${ic('link', 18)}<span><b>Hubungkan kamera bayi</b><small>Masukkan kode dari HP kamera</small></span></button>` : '';
+    const s = store.s, L = linkLabel();
     return `
     <header class="top">
-      <button class="who" data-go="baby">${babyAvatar(46)}<span><b>${esc(s.baby.name)}</b><small>${babyAge(s.baby.birth)}</small></span></button>
+      <button class="who" data-go="baby">${babyAvatar(44)}<span><b>${esc(s.baby.name)}</b><small>${babyAge(s.baby.birth)}</small></span></button>
       <div class="top-act">
-        ${s.mode === 'demo' ? `<button class="icon-btn soft only-narrow" data-act="demoPanel" aria-label="Panel simulasi">${ic('flask', 20)}</button>` : ''}
-        <button class="icon-btn soft" data-go="journal" aria-label="Kejadian">${ic('bell', 20)}${unread ? `<i class="dot-badge">${unread > 9 ? '9+' : unread}</i>` : ''}</button>
+        ${s.mode === 'demo' ? `<button class="tag-btn" data-act="demoPanel" aria-label="Panel simulasi">${ic('flask', 14)} Demo</button>`
+          : `<button class="link-dot tone-${L.tone}" data-go="devices" aria-label="${L.text}">${ic(L.icon, 16)}</button>`}
       </div>
     </header>
     <div class="stack">
-      ${banner}
-      <section class="hero" id="home-hero">${hero()}</section>
-      <button class="cam-card" data-go="live" aria-label="Buka tampilan langsung" id="home-cam">
+      ${s.mode === 'parent' && !s.pair.code ? `<button class="banner" data-go="connect">${ic('link', 18)}<span><b>Hubungkan kamera</b></span>${ic('chevR', 18)}</button>` : ''}
+      <button class="hero-cam" data-go="live" aria-label="Buka tampilan langsung" id="home-cam">
         <span class="live-tag"><i></i>LIVE</span>
-        ${live.temp != null ? `<span class="cam-chip">${ic('thermo', 12)} <b data-b="temp">${live.temp}</b>°C · <b data-b="hum">${live.hum}</b>%</span>` : ''}
-        <span class="cam-go">${ic('maximize', 16)}</span>
+        ${live.temp != null ? `<span class="cam-chip">${ic('thermo', 12)}<b data-b="temp">${live.temp}</b>°</span>` : ''}
+        <div class="hc-bottom"><div class="hc-left" id="home-status">${statusPill()}</div>
+          <span class="wave" id="home-wave" aria-hidden="true">${'<i></i>'.repeat(WAVE)}</span></div>
       </button>
-      <section class="conds" id="home-cond">${conditions()}</section>
-      <section class="qas" id="home-qa">${quickActions()}</section>
-      <div id="home-wake">${wakeCardHtml()}</div>
-      ${nightCardHtml()}
-      <section class="card care-card" id="home-care">${careCard()}</section>
-      <section class="card" id="home-sleep" data-go="journal?tab=sleep" role="button">${sleepCard()}</section>
-      <div class="sec-h"><h3>Peringatan terbaru</h3><a data-go="journal">Semua</a></div>
-      <section class="card list" id="home-ev">${recentEvents()}</section>
+      <section class="vits" id="home-vit">${vitals()}</section>
+      <section class="dock" id="home-dock">${dock()}</section>
+      <section class="bento" id="home-bento">${bento()}</section>
     </div>`;
   },
   mount(root) {
     const feedOff = mountFeed($('#home-cam', root));
     const set = (id, html) => { const el = $(id, root); if (el) el.innerHTML = html; };
+    const bars = $$('#home-wave i', root);
+    const wave = () => {
+      const h = live.hist.level.slice(-WAVE);
+      bars.forEach((b, i) => { const v = h[i - (WAVE - h.length)] ?? 0; b.style.transform = `scaleY(${Math.max(.08, v / 100).toFixed(2)})`; });
+    };
+    wave();
     const offs = [
       bus.on('tick', () => {
-        set('#home-cond', conditions());
+        set('#home-vit', vitals()); wave();
         const since = $('[data-b=since]', root);
-        if (since && !['offline', 'waiting', 'paused'].includes(statusNow().key)) since.textContent = sinceText().text;
-        if (live.temp != null) { const t = $('[data-b=temp]', root), h = $('[data-b=hum]', root); if (t) t.textContent = live.temp; if (h) h.textContent = live.hum; }
+        if (since && !['offline', 'waiting', 'paused'].includes(statusNow().key)) since.textContent = fmtDur(Date.now() - sinceText().from);
+        const t = $('[data-b=temp]', root); if (t && live.temp != null) t.textContent = live.temp;
       }),
-      bus.on('status', () => { set('#home-hero', hero()); set('#home-wake', wakeCardHtml()); }),
+      bus.on('status', () => set('#home-status', statusPill())),
       bus.on('source', () => router.refresh()),
-      bus.on('armed', () => set('#home-hero', hero())),
-      bus.on('link:state', () => set('#home-hero', hero())),
-      bus.on('lullaby', () => set('#home-qa', quickActions())),
-      bus.on('care', () => set('#home-care', careCard())),
-      bus.on('sleep', () => set('#home-wake', wakeCardHtml())),
-      bus.on('sleep', () => set('#home-sleep', sleepCard())),
-      bus.on('events', () => { set('#home-ev', recentEvents()); set('#home-sleep', sleepCard()); }),
+      bus.on('armed', () => set('#home-status', statusPill())),
+      bus.on('link:state', () => set('#home-status', statusPill())),
+      bus.on('lullaby', () => set('#home-dock', dock())),
+      ...['care', 'sleep', 'events'].map(ev => bus.on(ev, () => set('#home-bento', bento()))),
     ];
-    // napas berubah perlahan → perbarui kecepatan animasi orb sesekali
-    const t = setInterval(() => {
-      const o = $('.orb', root); if (o && live.rpm) o.style.setProperty('--breath', `${((60 / live.rpm) * 2).toFixed(1)}s`);
-      set('#home-wake', wakeCardHtml());   // lama bangun bertambah tiap menit
-    }, 8000);
+    const t = setInterval(() => { set('#home-bento', bento()); set('#home-status', statusPill()); }, 30000);
     return () => { feedOff(); offs.forEach(f => f()); clearInterval(t); };
   },
 });

@@ -14,27 +14,23 @@ route('more', {
   tab: 'more',
   render() {
     const s = store.s, L = linkLabel();
-    const item = (go, icon, label, sub = '', tone = '') => `<button class="row" ${go.startsWith('act:') ? `data-act="${go.slice(4)}"` : `data-go="${go}"`}>
-      <span class="row-ic ${tone}">${ic(icon, 18)}</span><span class="row-main"><b>${label}</b>${sub ? `<small>${sub}</small>` : ''}</span>${ic('chevR', 18, 'chev')}</button>`;
-    const modeName = { demo: 'Mode demo', parent: 'Monitor orang tua', baby: 'Kamera bayi' }[s.mode];
+    const tile = (go, icon, label, tone = 'pri', badge = '') => `<button class="mt tone-${tone}" ${go.startsWith('act:') ? `data-act="${go.slice(4)}"` : `data-go="${go}"`}>
+      <span>${ic(icon, 22)}${badge}</span><small>${label}</small></button>`;
+    const dot = on => `<i class="mt-dot ${on ? 'on' : ''}"></i>`;
     return `<header class="top"><h1 class="title">Lainnya</h1></header>
     <div class="stack">
-      <button class="card profile" data-go="baby">${babyAvatar(64)}<span><b>${esc(s.baby.name)}</b><small>${babyAge(s.baby.birth)} · ${s.baby.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</small></span>${ic('edit', 18, 'chev')}</button>
-      <div class="card list">
-        ${item('devices', 'radio', 'Perangkat & koneksi', s.mode === 'demo' ? modeName : `${modeName} · ${L.text}`, 'tone-pri')}
-        ${s.mode === 'baby' ? item('babycam', 'cctv', 'Layar kamera bayi', 'Kode pairing & HP orang tua', 'tone-accent') : ''}
-        ${item('settings', 'settings', 'Alarm & deteksi', 'Bunyi, sensitivitas, jam tenang', 'tone-warn')}
-        ${item('act:pinSheet', 'lock', 'Kunci aplikasi', s.settings.pinHash ? 'Aktif — PIN 4 angka' : 'Nonaktif', 'tone-ok')}
-      </div>
-      <div class="card list">
-        ${item('journal?tab=sleep', 'chart', 'Statistik tidur')}
-        ${item('act:exportCsv', 'download', 'Unduh jurnal (CSV)')}
-        ${item('act:printReport', 'heart', 'Laporan untuk dokter anak')}
-        ${s.mode === 'demo' ? item('act:demoPanel', 'flask', 'Panel simulasi') : ''}
-      </div>
-      <div class="card list">
-        ${item('help', 'help', 'Bantuan & cara pakai')}
-        ${item('help?about=1', 'info', 'Tentang aplikasi', 'Versi 3.0')}
+      <button class="card profile" data-go="baby">${babyAvatar(64)}<span><b>${esc(s.baby.name)}</b><small>${babyAge(s.baby.birth)}</small></span>${ic('edit', 18, 'chev')}</button>
+      <div class="mtiles">
+        ${tile('devices', 'radio', 'Perangkat', L.tone === 'muted' ? 'pri' : L.tone)}
+        ${s.mode === 'baby' ? tile('babycam', 'cctv', 'Kamera', 'accent') : ''}
+        ${tile('settings', 'bell', 'Alarm', 'warn')}
+        ${tile('act:pinSheet', 'lock', 'Kunci', 'ok', dot(!!s.settings.pinHash))}
+        ${tile('report', 'moonStar', 'Semalam', 'accent')}
+        ${tile('journal?tab=sleep', 'chart', 'Statistik', 'info')}
+        ${tile('act:printReport', 'heart', 'Dokter', 'bad')}
+        ${tile('act:exportCsv', 'download', 'CSV', 'pri')}
+        ${s.mode === 'demo' ? tile('act:demoPanel', 'flask', 'Simulasi', 'accent') : ''}
+        ${tile('help', 'help', 'Bantuan', 'info')}
       </div>
       ${disclaimer()}
     </div>`;
@@ -101,12 +97,11 @@ function opts(path, list, val) {
 route('settings', {
   render() {
     const S = store.s.settings, A = S.alarm;
-    const row = (title, sub, ctl) => `<div class="set-row"><div class="set-main"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</div>${ctl}</div>`;
+    const row = (icon, title, ctl) => `<div class="set-row"><span class="set-ic">${ic(icon, 17)}</span><div class="set-main"><b>${title}</b></div>${ctl}</div>`;
     return topbar('Alarm & deteksi') + `<div class="stack">
-      <div class="sec-h"><h3>${ic('sparkles', 16)} Deteksi</h3><small class="muted">ketuk = on/off · garis = sensitivitas</small></div>
+      <div class="sec-h"><h3>${ic('sparkles', 16)} Deteksi</h3></div>
       <div class="det-grid">${detTile('cry', 'Tangisan')}${detTile('motion', 'Gelisah')}${detTile('wake', 'Terbangun')}</div>
-      <details class="card more-det"><summary>${ic('flask', 16)} Deteksi lanjutan <small>(mode demo)</small>${ic('chevD', 16)}</summary>
-        <p class="muted small">Tengkurap, muntah, dan napas butuh model AI visi khusus di server/gateway (lihat PRD). Saat ini hanya bisa dicoba dengan bayi simulasi.</p>
+      <details class="card more-det"><summary>${ic('flask', 16)} Lanjutan <small>· demo</small>${ic('chevD', 16)}</summary>
         <div class="det-grid">${detTile('position', 'Tengkurap')}${detTile('vomit', 'Muntah')}${detTile('breath', 'Napas')}</div>
       </details>
 
@@ -114,32 +109,30 @@ route('settings', {
       ${opts('settings.alarm.sound', [['siren', 'alert', 'Sirene'], ['chime', 'bell', 'Lonceng'], ['voice', 'mic', 'Suara saja']], A.sound)}
       <div class="vol card">${ic('volumeX', 18)}<input type="range" min="20" max="100" step="5" value="${A.volume}" data-set="settings.alarm.volume" data-num data-out="#vol-out" data-unit="%" aria-label="Volume alarm">${ic('volume', 18)}<b id="vol-out">${A.volume}%</b></div>
       <div class="card">
-        ${row('Suara peringatan', `“${esc(TYPES.cry.speak(store.s.baby.name))}”`, toggle('settings.alarm.voice', A.voice, { label: 'Suara peringatan' }))}
-        ${row('Getar', '', toggle('settings.alarm.vibrate', A.vibrate, { label: 'Getar' }))}
-        ${clipsSupported() ? row('Simpan klip video kejadian', '±20 dtk sebelum & 10 dtk sesudah, disimpan di HP ini (30 terbaru)', toggle('settings.clips', S.clips !== false, { label: 'Klip video' })) : ''}
-        ${row('Notifikasi sistem', 'Saat aplikasi di latar belakang', toggle('settings.alarm.notify', A.notify, { after: 'askNotify', label: 'Notifikasi' }))}
-        ${row('Jam tenang', 'Peringatan ringan tanpa bunyi. Darurat tetap berbunyi.', toggle('settings.alarm.quiet.on', A.quiet.on, { after: 'rerender', label: 'Jam tenang' }))}
+        ${row('mic', 'Suara peringatan', toggle('settings.alarm.voice', A.voice, { label: 'Suara peringatan' }))}
+        ${row('activity', 'Getar', toggle('settings.alarm.vibrate', A.vibrate, { label: 'Getar' }))}
+        ${clipsSupported() ? row('video', 'Klip video kejadian', toggle('settings.clips', S.clips !== false, { label: 'Klip video' })) : ''}
+        ${row('bell', 'Notifikasi', toggle('settings.alarm.notify', A.notify, { after: 'askNotify', label: 'Notifikasi' }))}
+        ${row('moon', 'Jam tenang', toggle('settings.alarm.quiet.on', A.quiet.on, { after: 'rerender', label: 'Jam tenang' }))}
         ${A.quiet.on ? `<div class="times">${ic('moon', 16)}<input type="time" value="${A.quiet.from}" data-set="settings.alarm.quiet.from" aria-label="Mulai"><span>–</span><input type="time" value="${A.quiet.to}" data-set="settings.alarm.quiet.to" aria-label="Selesai"></div>` : ''}
       </div>
       <button class="btn btn-soft btn-lg" data-act="testAlarm">${ic('play', 18)} Tes bunyi alarm</button>
 
       <div class="sec-h"><h3>${ic('music', 16)} Penenang otomatis</h3></div>
       <div class="card">
-        ${row('Putar saat bayi menangis/gelisah', store.s.mode === 'parent' ? 'Diputar di speaker HP kamera bayi' : '', toggle('settings.alarm.autoSoothe', A.autoSoothe, { after: 'rerender', label: 'Penenang otomatis' }))}
+        ${row('sparkles', 'Otomatis saat menangis', toggle('settings.alarm.autoSoothe', A.autoSoothe, { after: 'rerender', label: 'Penenang otomatis' }))}
         ${A.autoSoothe ? `<div class="set-sub"><select data-set="settings.alarm.sootheTrack" aria-label="Pilih penenang">${Object.entries(TRACKS).map(([k, t]) => `<option value="${k}" ${A.sootheTrack === k ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
           ${seg('settings.alarm.sootheMins', [[10, '10m'], [20, '20m'], [45, '45m']], A.sootheMins, { num: true })}</div>` : ''}
       </div>
 
       <div class="sec-h"><h3>${ic('bottle', 16)} Pengingat menyusu</h3></div>
       <div class="card">
-        ${row('Ingatkan setelah susu terakhir', 'Toast, getar & suara lembut — bukan alarm darurat', '')}
         ${seg('settings.feedEvery', [[0, 'Mati'], [120, '2 j'], [150, '2,5 j'], [180, '3 j'], [240, '4 j']], S.feedEvery, { num: true })}
       </div>
 
       <div class="sec-h"><h3>${ic('sun', 16)} Tampilan</h3></div>
       ${opts('settings.theme', [['auto', 'sparkles', 'Otomatis'], ['light', 'sun', 'Terang'], ['dark', 'moon', 'Gelap']], S.theme)}
-      <p class="fine">Otomatis = gelap pukul 18.00–06.00, nyaman dilihat di kamar tidur.</p>
-      ${store.s.mode === 'baby' ? `<div class="card">${row('Redupkan layar kamera', 'Otomatis 45 detik setelah orang tua tersambung', toggle('settings.babyDim', S.babyDim))}</div>` : ''}
+      ${store.s.mode === 'baby' ? `<div class="card">${row('moon', 'Redupkan layar kamera', toggle('settings.babyDim', S.babyDim))}</div>` : ''}
       ${disclaimer()}
     </div>`;
   },
@@ -252,6 +245,7 @@ route('help', {
     ];
     return topbar('Bantuan') + `<div class="stack">
       <div class="card list">${faq.map(([q, a]) => `<details class="faq"><summary>${q}${ic('chevD', 18)}</summary><p>${a}</p></details>`).join('')}</div>
+      <button class="btn btn-ghost" data-go="help?about=1">${ic('info', 16)} Tentang aplikasi</button>
       ${disclaimer()}
     </div>`;
   },

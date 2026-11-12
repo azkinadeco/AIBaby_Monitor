@@ -1,7 +1,7 @@
 /* MODE DEMO — bayi simulasi.
    Menggambar "kamera" kamar bayi di canvas dan menghasilkan bacaan sensor tiruan,
    supaya seluruh aplikasi bisa dicoba tanpa perangkat kedua. */
-import { lerp, pad2 } from '../core/util.js';
+import { lerp } from '../core/util.js';
 import { bus } from '../core/bus.js';
 
 export const SIM_STATES = {
@@ -85,7 +85,7 @@ off.width = W; off.height = H;
 const c = off.getContext('2d');
 const targets = new Set();
 let holds = 0;
-let breathPhase = 0, lastT = 0, lastFrame = 0, night = false, label = '';
+let breathPhase = 0, lastT = 0, lastFrame = 0, night = false;
 
 export const simCam = {
   W, H, canvas: off,
@@ -94,7 +94,6 @@ export const simCam = {
   hold() { holds++; return () => { holds = Math.max(0, holds - 1); }; },
   set night(v) { night = v; },
   get night() { return night; },
-  set label(v) { label = v; },
   snapshot(w = 320, q = .7) {
     draw(performance.now() / 1000);
     const s = document.createElement('canvas');
@@ -259,18 +258,8 @@ function face(t, st, hx, hy) {
   else { c.strokeStyle = '#b5615c'; c.lineWidth = 3; c.beginPath(); c.arc(mx - (st === 'awake' ? 6 : 4), hy, st === 'awake' ? 9 : 5, -Math.PI / 3, Math.PI / 3); c.stroke(); }
 }
 
+/* Penanda deteksi AI (sudut kotak). Label/jam tidak digambar — UI aplikasi sudah menampilkannya. */
 function hud(pos) {
-  const d = new Date();
-  const ts = `${pad2(d.getDate())}-${pad2(d.getMonth() + 1)}-${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
-  c.font = '600 14px ui-monospace, Menlo, monospace';
-  c.textBaseline = 'middle';
-  c.fillStyle = 'rgba(0,0,0,.4)'; rr(12, H - 34, c.measureText(ts).width + 16, 24, 6); c.fill();
-  c.fillStyle = 'rgba(255,255,255,.92)'; c.fillText(ts, 20, H - 21.5);
-  if (label) {
-    const w = c.measureText(label).width + 16;
-    c.fillStyle = 'rgba(0,0,0,.4)'; rr(W - w - 12, H - 34, w, 24, 6); c.fill();
-    c.fillStyle = 'rgba(255,255,255,.92)'; c.fillText(label, W - w - 4, H - 21.5);
-  }
   if (!sim.overlay || !pos) return;
   const alert = !['sleep', 'awake'].includes(sim.state);
   c.strokeStyle = alert ? 'rgba(255,110,110,.95)' : 'rgba(140,240,200,.85)'; c.lineWidth = 3;

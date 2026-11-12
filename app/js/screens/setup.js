@@ -56,8 +56,8 @@ route('connect', {
     return `${topbar('Sambungkan kamera')}
     <div class="stack">
       <div class="steps-ill">
-        <div><span>1</span><p>Di HP kamera, buka aplikasi ini lalu pilih <b>Jadikan HP ini kamera bayi</b>.</p></div>
-        <div><span>2</span><p>Pindai QR di layarnya dengan kamera HP ini, <b>atau</b> ketik kodenya di bawah.</p></div>
+        <div><span>1</span><p>HP kamera → <b>Jadikan kamera bayi</b></p></div>
+        <div><span>2</span><p>Pindai QR, atau ketik kode</p></div>
       </div>
       <form class="form card" id="pair-form" autocomplete="off">
         <label class="field"><span>Kode kamera</span><input name="code" class="code-in" value="${esc(code)}" maxlength="6" placeholder="K7P2QX" required pattern="[A-Za-z0-9]{6}" autocapitalize="characters" spellcheck="false"></label>
@@ -66,7 +66,6 @@ route('connect', {
         <div id="pair-status">${connectStatus()}</div>
         <button class="btn btn-pri btn-lg" type="submit">${ic('link', 18)} Sambungkan</button>
       </form>
-      <p class="fine center">Video & suara mengalir langsung antar-HP (peer-to-peer, terenkripsi WebRTC). Untuk hasil terbaik, kedua HP di Wi-Fi yang sama.</p>
     </div>`;
   },
   mount(root, { c, k }) {

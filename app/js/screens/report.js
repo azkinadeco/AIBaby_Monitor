@@ -5,8 +5,7 @@ import { store } from '../core/store.js';
 import { bus } from '../core/bus.js';
 import { route, router } from '../core/router.js';
 import { actions, toast, topbar, empty } from '../core/ui.js';
-import { nightReport, reportText, wakeWindow, nextFeed } from '../services/insights.js';
-import { live } from '../services/monitor.js';
+import { nightReport, reportText } from '../services/insights.js';
 import { CARE } from './shared.js';
 
 /* ---------- Grafik aktivitas semalam (SVG) ---------- */
@@ -77,37 +76,3 @@ actions.shareReport = async () => {
     if (e?.name !== 'AbortError') toast('Tidak bisa membagikan dari browser ini', { icon: 'info' });
   }
 };
-
-/* ---------- Kartu untuk Beranda ---------- */
-/** Ringkasan semalam — tampil pagi hari (05.00–13.00) */
-export function nightCardHtml() {
-  const h = new Date().getHours();
-  if (h < 5 || h >= 13) return '';
-  const r = nightReport();
-  if (!r.hasData) return '';
-  return `<button class="card night-card" data-go="report">
-    <div class="nc-h"><span class="tone-accent">${ic('moonStar', 18)}</span><b>Laporan semalam</b>${ic('chevR', 18, 'chev')}</div>
-    <div class="nc-nums"><div><b>${fmtDur(r.total)}</b><small>tidur</small></div><div><b>${r.wakes}×</b><small>terbangun</small></div><div><b>${fmtDur(r.longest)}</b><small>terpanjang</small></div></div>
-  </button>`;
-}
-
-/** Jendela tidur: sudah berapa lama bangun & kapan idealnya tidur lagi */
-export function wakeCardHtml() {
-  const w = wakeWindow();
-  // sembunyikan juga saat status kamera sudah 'tidur' walau sesi tidur belum resmi tercatat
-  if (w.asleep || !w.since || ['sleep', 'offline', 'waiting'].includes(live.status)) return '';
-  const pct = Math.min(1, w.pct), tone = pct >= 1 ? 'warn' : pct >= w.lo / w.hi ? 'accent' : 'ok';
-  const msg = Date.now() < w.from ? `Idealnya tidur lagi ${fmtTime(w.from)}–${fmtTime(w.to)}` : Date.now() <= w.to ? 'Sekarang waktu yang pas untuk menidurkan' : 'Sudah lewat jendela tidur — mungkin mulai rewel';
-  return `<div class="card wake-card tone-${tone}">
-    <div class="wc-h"><span>${ic('sun', 18)}</span><div><small>Sudah bangun</small><b>${fmtDur(w.awake)}</b></div><small class="wc-msg">${msg}</small></div>
-    <div class="wc-bar"><span class="wc-zone" style="left:${(w.lo / w.hi * 100).toFixed(1)}%"></span><i style="width:${(pct * 100).toFixed(1)}%"></i></div>
-    <small class="muted">Panduan umum usia ini: bangun ${w.lo}–${w.hi} menit di antara tidur.</small>
-  </div>`;
-}
-
-/** Teks "berikutnya ±HH.MM" untuk kartu susu */
-export function nextFeedText() {
-  const f = nextFeed();
-  if (!f) return '';
-  return f.due ? `<em class="tone-warn">sudah waktunya</em>` : `<em>berikutnya ±${fmtTime(f.at)}</em>`;
-}

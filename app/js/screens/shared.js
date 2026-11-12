@@ -1,5 +1,5 @@
 /* Komponen yang dipakai beberapa layar. */
-import { $, $$, esc, fmtTime, fmtDay, fmtAgo, fmtDur, HOUR, clamp } from '../core/util.js';
+import { $, $$, esc, fmtTime, fmtDay, fmtDur, HOUR, clamp } from '../core/util.js';
 import { ic } from '../core/icons.js';
 import { store } from '../core/store.js';
 import { bus } from '../core/bus.js';
@@ -27,7 +27,7 @@ export function eventRow(e) {
   const st = e.level === 'info' ? '' : e.falseAlarm ? `<span class="badge muted">Palsu</span>` : e.ack ? `<span class="badge ok">${ic('check', 12)}</span>` : '<span class="badge bad">Baru</span>';
   return `<button class="row" data-go="event/${e.id}">
     <span class="row-ic tone-${levelTone(e.level)}">${ic(T.icon, 18)}</span>
-    <span class="row-main"><b>${T.label}</b><small>${fmtTime(e.ts)} · ${fmtAgo(e.ts)}</small></span>
+    <span class="row-main"><b>${T.label}</b><small>${fmtTime(e.ts)}</small></span>
     ${st}
   </button>`;
 }
@@ -38,7 +38,7 @@ export function groupByDay(list) {
 }
 
 /* ---------------- Timeline tidur 24 jam terakhir ---------------- */
-export function timeline24({ events = true } = {}) {
+export function timeline24({ events = true, labels: showLabels = true } = {}) {
   const now = Date.now(), from = now - 24 * HOUR, pct = t => clamp((t - from) / (24 * HOUR) * 100, 0, 100);
   const segs = store.s.sleep.filter(x => (x.end || now) > from).map(x => {
     const a = pct(x.start), b = pct(x.end || now);
@@ -50,6 +50,7 @@ export function timeline24({ events = true } = {}) {
   let labels = '';
   for (let t = first.getTime(); t < now - 2.5 * HOUR; t += 6 * HOUR) labels += `<small style="left:${pct(t)}%">${fmtTime(t).replace(':', '.')}</small>`;
   labels += '<small class="now" style="left:100%">Kini</small>';
+  if (!showLabels) return `<div class="tl mini"><div class="tl-track">${segs}${dots}</div></div>`;
   return `<div class="tl"><div class="tl-track">${segs}${dots}</div><div class="tl-lbl">${labels}</div></div>`;
 }
 
@@ -120,7 +121,7 @@ actions.lullaby = () => openLullSheet();
 /* ---------------- Bicara ke bayi ---------------- */
 const PHRASES = ['Sssh… Bunda di sini', 'Tidur lagi ya, Nak', 'Ayah segera ke sana', 'Anak pintar, bobo ya'];
 export function talkButtonHtml(big = false) {
-  return `<div class="talk ${big ? 'big' : ''}"><button class="talk-btn" data-talk aria-label="Tahan untuk bicara">${ic('mic', big ? 30 : 24)}</button><span class="talk-lbl">Tahan untuk bicara</span></div>`;
+  return `<div class="talk ${big ? 'big' : ''}"><button class="talk-btn" data-talk aria-label="Tahan untuk bicara">${ic('mic', big ? 30 : 24)}</button><span class="talk-lbl">Tahan</span></div>`;
 }
 /** Tombol tahan-untuk-bicara (pointer down/up). */
 export function bindTalk(root) {
@@ -132,14 +133,14 @@ export function bindTalk(root) {
       e.preventDefault();
       if (!control.canReach) { toast('Kamera bayi belum tersambung', { icon: 'wifiOff', tone: 'warn' }); return; }
       on = true; t0 = Date.now(); b.classList.add('on');
-      if (lbl) lbl.textContent = 'Bicara… lepas untuk selesai';
+      if (lbl) lbl.textContent = 'Bicara…';
       const ok = await control.talk(true);
       if (!ok && on) { toast('Mikrofon tidak bisa dipakai', { icon: 'micOff', tone: 'warn' }); end(); }
     };
     const end = () => {
       if (!on) return;
       on = false; b.classList.remove('on');
-      if (lbl) lbl.textContent = 'Tahan untuk bicara';
+      if (lbl) lbl.textContent = 'Tahan';
       control.talk(false);
       const d = (Date.now() - t0) / 1000;
       if (d > .5 && store.s.mode === 'demo') toast(`Pesan suara ${d.toFixed(1)} dtk (simulasi)`, { icon: 'volume' });
@@ -202,8 +203,9 @@ export function openCareSheet(type = 'milk') {
 actions.care = el => openCareSheet(el?.dataset?.t || 'milk');
 actions.quickCare = el => {
   const t = el.dataset.t;
-  store.addCare(t, CARE[t].presets[t === 'milk' ? 2 : 0]);
-  toast(`${CARE[t].label} dicatat · ${fmtTime(Date.now())}`, { icon: 'check', tone: 'ok' });
+  const item = store.addCare(t, CARE[t].presets[t === 'milk' ? 2 : 0]);
+  el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+  toast(`${CARE[t].label} · ${fmtTime(item.ts)}`, { icon: CARE[t].icon, tone: 'ok', action: { label: 'Urungkan', fn: () => store.removeCare(item.id) } });
 };
 export const lastCare = type => store.s.care.find(c => c.type === type);
 
