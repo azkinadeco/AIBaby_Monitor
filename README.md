@@ -1,77 +1,83 @@
-# AI Baby Monitor — Prototipe Aplikasi (Web, Portrait)
+# AI Baby Monitor v3
 
-**Live demo:** https://aibabymonitor.vercel.app
+**Live:** https://aibabymonitor.vercel.app
 
-**Pakai di iPhone seperti aplikasi:** buka link di Safari → ketuk tombol Share → *Add to Home Screen*. Aplikasi terbuka layar penuh dengan ikon sendiri.
+Ubah **dua HP** menjadi baby monitor: satu di kamar bayi sebagai **kamera**, satu di tangan orang tua sebagai **monitor dengan alarm**. Orang tua bisa tetap beraktivitas atau tidur nyenyak — HP akan berbunyi kalau si kecil menangis, gelisah, atau kalau kamera terputus.
 
-Aplikasi pemantau bayi berbasis AI sesuai PRD. Kamera CCTV, sensor, dan speaker **masih disimulasikan** (dummy) karena hardware belum tersedia.
+Tanpa build, tanpa server sendiri: cukup file statis (HTML + CSS + ES modules).
 
-## Cara menjalankan
+## Cara pakai
+
+1. **HP kamera bayi** (HP lama pun bisa): buka aplikasi → *Jadikan HP ini kamera bayi* → *Mulai kamera*. Letakkan 1–1,5 m dari boks dan colokkan charger.
+2. **HP orang tua**: buka aplikasi → *HP ini untuk orang tua* → pindai QR di layar HP kamera (atau ketik kode + kunci 6 angka).
+3. Malam hari, aktifkan **Mode tidur** di HP orang tua: layar hampir hitam tapi tetap menyala sehingga alarm pasti terdengar.
+
+Belum punya HP kedua? Pilih **Coba dulu (mode demo)** — bayi simulasi dengan panel untuk memicu tangisan, tengkurap, dsb.
+
+## Fitur
+
+| | |
+|---|---|
+| **Kamera bayi ⇄ monitor (WebRTC)** | Video & suara langsung antar-HP (peer-to-peer). Beberapa HP orang tua bisa memantau satu kamera. Orang tanpa kunci ditolak. |
+| **Deteksi di perangkat** | Tangisan (suara keras + bernada harmonis + nada dasar ≥ 280 Hz, agar kipas/AC/TV/obrolan tidak memicu alarm), gelisah & terbangun (gerakan piksel). |
+| **Alarm** | Layar penuh, sirene/lonceng + suara Bahasa Indonesia, getar, notifikasi sistem, jam tenang. Alarm khusus bila **kamera terputus** atau **baterai kamera lemah**. |
+| **Penenang otomatis** | White noise, detak jantung ibu, hujan, Nina Bobo, Brahms, Twinkle — diputar **di speaker HP kamera** saat bayi menangis; bisa juga dikendalikan manual + timer. |
+| **Bicara ke bayi** | Tahan tombol untuk bicara (mikrofon HP orang tua → speaker kamera) atau putar kalimat siap pakai. |
+| **Sesi tidur otomatis** | Tercatat saat bayi tenang beberapa menit; timeline 24 jam, grafik 7 hari dengan rentang anjuran sesuai usia. |
+| **Jurnal** | Susu, popok, suhu, obat; tumbuh kembang dengan kurva berat badan vs median WHO; milestone; ekspor CSV & laporan PDF untuk dokter anak. |
+| **Lainnya** | Mode gelap otomatis (18.00–06.00), kunci PIN (tersimpan sebagai hash), PWA bisa dipasang ke layar utama, rekam/foto/jendela mengambang. |
+
+> Deteksi **tengkurap, muntah, dan napas** butuh model AI visi khusus (lihat PRD) sehingga saat ini hanya tersedia di mode demo.
+
+## Batasan yang perlu diketahui
+
+- Browser HP membatasi suara saat aplikasi ditutup/layar terkunci → gunakan **Mode tidur** di HP orang tua dan biarkan aplikasi kamera tetap terbuka.
+- Koneksi memakai server signaling publik PeerJS (`0.peerjs.com`) hanya untuk "berkenalan"; video tidak lewat server. Sebagian jaringan seluler memblokir koneksi langsung — paling andal bila kedua HP di Wi-Fi yang sama. Untuk produksi, siapkan server PeerJS & TURN sendiri.
+- Ini alat bantu pemantauan, **bukan alat medis** dan bukan pengganti pengawasan orang tua.
+
+## Menjalankan di komputer
+
 ```bash
 cd app
 python3 -m http.server 8765
 ```
-Buka http://localhost:8765 — di laptop tampil bingkai HP + **Panel Simulasi** di samping.
-Di HP (satu Wi-Fi): buka http://IP-LAPTOP:8765 — panel simulasi dibuka lewat tombol tabung (kanan bawah).
+Buka http://localhost:8765. Kamera & mikrofon di HP memerlukan **HTTPS** (atau `localhost`), jadi untuk uji 2 HP gunakan versi yang sudah di-deploy ke Vercel.
 
-> Klik sekali di halaman agar browser mengizinkan suara (alarm sirene + suara Bahasa Indonesia).
+## Struktur kode
 
-## Fitur
-- **Langsung ke Beranda (mode demo)** — login hanya diminta untuk fitur lanjutan (aktivitas, pengaturan, perangkat, keluarga, paket)
-- **3 tab simpel:** Beranda · Live · Aktivitas (profil lewat avatar)
-- Beranda visual: kamera live + status AI, gauge suara/gerakan/napas/posisi, tombol bulat (Lagu, Bicara, Tes, AI on/off), skor & timeline tidur 24 jam
-- Live: bicara, lagu, dengar audio kamar, foto, mode malam (IR), deteksi AI pakai titik warna
-- Alarm layar penuh + speaker (sirene + suara Bahasa Indonesia), konfirmasi, bisukan, alarm palsu, eskalasi ke keluarga
-- Lagu tidur: Twinkle, Brahms, White noise + timer 15/30/60 menit + mini player dengan tombol stop
-- Aktivitas: daftar kejadian + grafik tidur 7 hari
-- Pengaturan berbentuk tile: on/off deteksi, sensitivitas, jenis bunyi, volume, jam tenang
-- Setup kamera (QR paket / RTSP-ONVIF) & speaker; pilihan Paket Lengkap atau Paket Aplikasi
-- **Mode gelap otomatis** (18.00–06.00) atau manual di Pengaturan → Tampilan
-- Perangkat & Keluarga berbentuk kartu: volume speaker, tes, hapus, undang anggota, atur notifikasi per anggota
-- Mode internet putus → gateway lokal tetap membunyikan alarm
-- **Kamera & Mikrofon Asli (WebRTC / Web Audio API)** — beralih dari kamera simulasi ke kamera & mikrofon HP/laptop asli untuk mendeteksi suara tangisan (dB) dan gerakan piksel secara *real-time*
-- **Digital Zoom (1x–3x), Pan, Zona Aman Boks (AI Geofence), & Picture-in-Picture (PiP)** — kontrol kamera canggih dan jendela video mengambang
-- **Smart Auto-Soothe AI & 6 Suara Penenang** — Twinkle, Brahms, Nina Bobo, White Noise, Hujan Lembut, dan Detak Jantung Ibu (otomatis menyala saat bayi menangis)
-- **Rekam Video Live (.webm)** — rekam dan unduh video langsung dari layar Live
-- **Jurnal Perawatan & Kurva Tumbuh Kembang (KMS/WHO)** — catat ASI/susu, popok, suhu tubuh, berat/tinggi badan, lingkar kepala, dan checklist milestone perkembangan
-- **Kunci Aplikasi PIN 4 Digit & Biometrik** — proteksi layar saat aplikasi dibuka (Keamanan & Privasi)
-- **Ekspor Data CSV & Unggah Foto Bayi** — unduh riwayat kejadian + perawatan ke file CSV dan pasang foto profil si kecil
-- **Sinkronisasi 2 Perangkat & Backend FastAPI** — sinkronisasi *stream* + alarm antar tab/perangkat dan dukungan penuh endpoint PRD (`/health`, `/ingest/frame`, `/ingest/heartbeat`, `/v1/notify`, `/v1/test-alarm`, `/v1/status`)
-- Panel Simulasi (pengganti hardware): picu tangisan, tengkurap, muntah, napas, kamera/internet mati, demo otomatis, atau aktifkan kamera asli
-
-## Menjalankan Backend FastAPI (Sesuai PRD)
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
-Cek status di `http://127.0.0.1:8000/health` atau hubungkan langsung dari aplikasi melalui menu **Perangkat → Sinkronisasi 2 Tab / Perangkat**.
-
-## Struktur
 ```
 app/
-  index.html, manifest.webmanifest, sw.js (PWA)
-  css/styles.css
-  js/store.js    state (localStorage) → nanti diganti API FastAPI
-  js/camera.js   kamera DUMMY (canvas) → nanti diganti player stream WebRTC/HLS
-  js/engine.js   mesin AI SIMULASI → nanti diganti hasil Cloud AI (/v1/notify)
-  js/audio.js    sirene, TTS, lagu tidur
-  js/app.js      router, alarm, toast/sheet
-  js/screens.js  semua layar
-  js/sim.js      panel simulasi + boot
+  index.html · manifest.webmanifest · sw.js (PWA, network-first)
+  css/app.css               token tema → komponen → layar → overlay
+  js/main.js                titik masuk: penjaga rute, tab bar, lanjutkan sambungan
+  js/core/
+    util.js                 format waktu Indonesia, wake lock, unduhan, dll.
+    store.js                state tersimpan (localStorage) + data contoh + migrasi dari v1
+    router.js               router hash (#/home, #/journal?tab=sleep) — tombol kembali berfungsi
+    ui.js                   toast, bottom sheet, konfirmasi, tema, delegasi data-act / data-go
+    bus.js · icons.js
+  js/services/
+    monitor.js              OTAK: bacaan sensor → status bayi → kejadian → sesi tidur
+    detector.js             analisis mikrofon & kamera di perangkat (tangisan, gerakan)
+    link.js                 WebRTC/PeerJS: pairing, video, perintah, tahan-untuk-bicara
+    babyUnit.js             logika HP kamera bayi (kode pairing, baterai, perintah dari orang tua)
+    alarm.js                layar alarm, sirene, notifikasi, penenang otomatis
+    control.js              lagu/bicara/dengar diarahkan ke HP kamera atau lokal (demo)
+    audio.js                sirene, TTS Bahasa Indonesia, lagu & white noise (Web Audio)
+    sim.js                  bayi simulasi untuk mode demo
+    feed.js                 menampilkan gambar kamera dari sumber aktif
+  js/screens/               home, live, journal, babycam, night, setup, more, shared
+backend/                    contoh API FastAPI sesuai PRD (untuk integrasi CCTV/gateway nanti)
 ```
 
-## Menjadi APK / iOS (Capacitor)
+## Backend FastAPI (opsional)
+
+Contoh API sesuai PRD (`/health`, `/ingest/*`, `/v1/notify`, `/v1/test-alarm`, `/v1/status`) untuk integrasi kamera CCTV/gateway di masa depan. Aplikasi web v3 tidak membutuhkannya.
+
 ```bash
-npm init -y && npm i @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
-npx cap init "AI Baby Monitor" id.aibabymonitor.app --web-dir app
-npx cap add android && npx cap add ios
-npx cap open android   # build APK di Android Studio
-npx cap open ios       # build di Xcode (butuh Mac + akun Apple Developer)
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env      # ganti INGEST_TOKEN dengan nilai acak
+uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
-Untuk produksi tambahkan: push notification (FCM/APNs), plugin background audio, dan ganti modul dummy di atas dengan backend asli.
-
-Harga paket di aplikasi hanya contoh.

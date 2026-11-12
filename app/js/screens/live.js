@@ -1,0 +1,174 @@
+/* LIVE — lihat & dengar kamar bayi, bicara, putar penenang, foto/rekam. */
+import { $, esc, download, pad2 } from '../core/util.js';
+import { ic } from '../core/icons.js';
+import { store } from '../core/store.js';
+import { bus } from '../core/bus.js';
+import { route } from '../core/router.js';
+import { actions, toast } from '../core/ui.js';
+import { live, TYPES, snapshot, setArmed, localCam } from '../services/monitor.js';
+import { mountFeed } from '../services/feed.js';
+import { control, setListen } from '../services/control.js';
+import { simCam } from '../services/sim.js';
+import { link } from '../services/link.js';
+import { statusNow, soundWord, moveWord, drawSpark, cssVar, talkButtonHtml, bindTalk, linkLabel } from './shared.js';
+
+const STATUS_DET = { cry: 'cry', active: 'motion', awake: 'wake', prone: 'position', vomit: 'vomit', breath: 'breath' };
+let rec = null;   // { mr, chunks, t0, timer }
+
+function statusPill() {
+  const S = statusNow();
+  return `<span class="tone-${S.tone}">${ic(S.icon, 15)}</span><b>${S.text}</b>`;
+}
+function detChips() {
+  const D = store.s.settings.detect, real = live.source !== 'sim';
+  const keys = real ? ['cry', 'motion', 'wake'] : ['cry', 'motion', 'wake', 'position', 'vomit', 'breath'];
+  const hit = STATUS_DET[live.status];
+  return keys.map(k => `<span class="det ${D[k].on ? '' : 'off'} ${hit === k ? 'hit' : ''}">${ic(TYPES[k].icon, 14)}${TYPES[k].short}</span>`).join('');
+}
+function controls() {
+  const l = control.lullState(), listen = store.s.listen;
+  return `<button class="lc ${listen ? 'on' : ''}" data-act="liveListen"><span>${ic(listen ? 'volume' : 'volumeX', 22)}</span><small>${listen ? 'Mendengar' : 'Dengar'}</small></button>
+    ${talkButtonHtml(true)}
+    <button class="lc ${l.on ? 'on' : ''}" data-act="lullaby"><span>${ic('music', 22)}</span><small>${l.on ? 'Diputar' : 'Penenang'}</small></button>`;
+}
+function tools() {
+  const t = (act, icon, label, on = false) => `<button class="tool ${on ? 'on' : ''}" data-act="${act}">${ic(icon, 18)}<span>${label}</span></button>`;
+  return t('livePhoto', 'camera', 'Foto')
+    + t('liveRec', 'record', rec ? 'Stop' : 'Rekam', !!rec)
+    + (live.source === 'sim' ? t('liveNight', 'moon', 'Inframerah', simCam.night) : '')
+    + (live.source === 'local' ? t('liveFlip', 'flip', 'Balik') : '')
+    + t('liveArm', store.s.armed === false ? 'play' : 'pause', store.s.armed === false ? 'Aktifkan AI' : 'Jeda AI', store.s.armed === false);
+}
+
+route('live', {
+  tab: 'live', dark: true,
+  render() {
+    const L = linkLabel();
+    const cam = store.s.mode === 'parent' ? (link.baby?.name ? `Kamar ${esc(link.baby.name)}` : 'Kamera bayi') : live.source === 'local' ? 'Kamera perangkat ini' : 'Kamera demo';
+    return `
+    <header class="bar">
+      <span class="bar-sp"></span>
+      <div class="bar-t"><h1>${cam}</h1><small class="tone-${L.tone}" id="live-link">${ic(L.icon, 12)} ${L.text}</small></div>
+      <button class="icon-btn" data-go="devices" aria-label="Perangkat">${ic('settings', 20)}</button>
+    </header>
+    <div class="live-view" id="live-view">
+      <div class="lv-top"><span class="live-tag"><i></i>LIVE</span>${rec ? `<span class="rec-tag"><i></i><span id="rec-time">00:00</span></span>` : ''}</div>
+      <div class="lv-nosig">${ic('wifiOff', 30)}<b>Menunggu gambar…</b><small>${store.s.mode === 'parent' ? 'Pastikan aplikasi di HP kamera bayi tetap terbuka.' : 'Kamera belum aktif.'}</small></div>
+      <div class="lv-status" id="live-status">${statusPill()}</div>
+      <div class="lv-corner">
+        <button class="lv-btn" data-act="livePip" aria-label="Jendela mengambang">${ic('copy', 17)}</button>
+        <button class="lv-btn" data-act="liveFull" aria-label="Layar penuh">${ic('maximize', 17)}</button>
+      </div>
+    </div>
+    <div class="live-ctl" id="live-ctl">${controls()}</div>
+    <div class="tools" id="live-tools">${tools()}</div>
+    <div class="meters">
+      <div class="meter-row"><div><small>${ic('volume', 13)} Suara</small><b id="m-sound">${soundWord(live.level, live.cry)}</b></div><canvas class="spark" id="sp-sound"></canvas></div>
+      <div class="meter-row"><div><small>${ic('move', 13)} Gerakan</small><b id="m-move">${moveWord(live.motion)}</b></div><canvas class="spark" id="sp-move"></canvas></div>
+      <div class="dets" id="live-dets">${detChips()}</div>
+    </div>`;
+  },
+  mount(root) {
+    const view = $('#live-view', root);
+    const feedOff = mountFeed(view);
+    const talkOff = bindTalk(root);
+    const colA = cssVar('--accent') || '#F5C28A', colB = cssVar('--pri') || '#8B7CF6';
+    const draw = () => {
+      drawSpark($('#sp-sound', root), live.hist.level, { color: colA, line: 62 });
+      drawSpark($('#sp-move', root), live.hist.motion, { color: colB });
+      $('#m-sound', root).textContent = soundWord(live.level, live.cry);
+      $('#m-move', root).textContent = moveWord(live.motion);
+    };
+    draw();
+    const set = (id, html) => { const el = $(id, root); if (el) el.innerHTML = html; };
+    const offs = [
+      bus.on('tick', () => { draw(); set('#live-dets', detChips()); }),
+      bus.on('status', () => set('#live-status', statusPill())),
+      bus.on('armed', () => { set('#live-status', statusPill()); set('#live-tools', tools()); }),
+      bus.on('lullaby', () => { set('#live-ctl', controls()); bindTalk($('#live-ctl', root)); }),
+      bus.on('listen', () => { set('#live-ctl', controls()); bindTalk($('#live-ctl', root)); }),
+      bus.on('link:state', () => { const L = linkLabel(), el = $('#live-link', root); if (el) { el.className = 'tone-' + L.tone; el.innerHTML = `${ic(L.icon, 12)} ${L.text}`; } }),
+    ];
+    const recT = setInterval(() => {
+      const el = $('#rec-time', root);
+      if (el && rec) { const s = Math.floor((Date.now() - rec.t0) / 1000); el.textContent = `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`; }
+    }, 500);
+    return () => { feedOff(); talkOff(); offs.forEach(f => f()); clearInterval(recT); };
+  },
+});
+
+/* ---------------- Aksi ---------------- */
+const rerenderTools = () => { const el = $('#live-tools'); if (el) el.innerHTML = tools(); };
+
+actions.liveListen = () => {
+  const on = !store.s.listen;
+  setListen(on);
+  if (on && live.source === 'local') toast('Mode demo: kamera HP ini tidak diputar ulang agar tidak berdengung', { icon: 'info' });
+  else toast(on ? 'Mendengarkan kamar bayi' : 'Suara kamar dimatikan', { icon: on ? 'volume' : 'volumeX' });
+};
+actions.livePhoto = () => {
+  const data = snapshot(1280, .92);
+  if (!data) { toast('Belum ada gambar', { icon: 'alert', tone: 'warn' }); return; }
+  download(data, `${store.s.baby.name.toLowerCase()}-${Date.now()}.jpg`);
+  const f = document.createElement('div'); f.className = 'flash'; $('#live-view')?.appendChild(f); setTimeout(() => f.remove(), 400);
+  toast('Foto disimpan', { icon: 'camera' });
+};
+actions.liveRec = () => {
+  if (rec) {
+    rec.mr.state !== 'inactive' && rec.mr.stop();
+    return;
+  }
+  const stream = live.source === 'sim' ? simCam.canvas.captureStream?.(20) : live.source === 'local' ? localCam.stream : link.remoteStream;
+  if (!stream || !('MediaRecorder' in window)) { toast('Perekaman tidak didukung di browser ini', { icon: 'alert', tone: 'warn' }); return; }
+  const mime = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find(m => MediaRecorder.isTypeSupported?.(m)) || '';
+  try {
+    const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    const chunks = [];
+    mr.ondataavailable = e => e.data?.size && chunks.push(e.data);
+    mr.onstop = () => {
+      const type = mr.mimeType || 'video/webm';
+      download(new Blob(chunks, { type }), `rekaman-${store.s.baby.name.toLowerCase()}-${Date.now()}.${type.includes('mp4') ? 'mp4' : 'webm'}`);
+      rec = null; rerenderTools(); $('.rec-tag')?.remove();
+      toast('Rekaman disimpan', { icon: 'download', tone: 'ok' });
+    };
+    mr.start(500);
+    rec = { mr, chunks, t0: Date.now() };
+    rerenderTools();
+    $('.lv-top')?.insertAdjacentHTML('beforeend', '<span class="rec-tag"><i></i><span id="rec-time">00:00</span></span>');
+    toast('Merekam… ketuk Stop untuk menyimpan', { icon: 'record', tone: 'bad' });
+  } catch { toast('Gagal memulai perekaman', { icon: 'alert', tone: 'warn' }); }
+};
+actions.liveNight = () => {
+  store.set('settings.nightVision', simCam.night ? 'off' : 'on');
+  simCam.night = !simCam.night;
+  rerenderTools();
+};
+actions.liveFlip = async () => { await localCam.flip(); bus.emit('localcam'); };
+actions.liveArm = () => {
+  const on = store.s.armed === false;
+  setArmed(on);
+  toast(on ? 'Pemantauan AI aktif' : 'Pemantauan dijeda — alarm otomatis mati', { icon: on ? 'shield' : 'pause', tone: on ? 'ok' : 'warn' });
+};
+actions.liveFull = () => {
+  const v = $('#live-view');
+  if (!v) return;
+  if (document.fullscreenElement) document.exitFullscreen();
+  else if (v.requestFullscreen) v.requestFullscreen().catch(() => v.classList.toggle('fs'));
+  else v.classList.toggle('fs');
+};
+let pipVideo = null;
+actions.livePip = async () => {
+  try {
+    if (document.pictureInPictureElement) { await document.exitPictureInPicture(); return; }
+    let v = $('#live-view video.feed');
+    if (!v) {
+      pipVideo ||= Object.assign(document.createElement('video'), { muted: true, playsInline: true });
+      pipVideo.srcObject = simCam.canvas.captureStream(20);
+      await pipVideo.play();
+      v = pipVideo;
+    }
+    if (!v.requestPictureInPicture) throw new Error('unsupported');
+    await v.requestPictureInPicture();
+    toast('Jendela mengambang aktif — bisa sambil buka aplikasi lain', { icon: 'copy', tone: 'ok' });
+  } catch { toast('Browser ini belum mendukung jendela mengambang', { icon: 'info', tone: 'warn' }); }
+};

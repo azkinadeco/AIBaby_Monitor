@@ -1,12 +1,12 @@
 {
   "name": "AI Baby Monitor",
   "short_name": "Baby Monitor",
-  "description": "Pemantauan bayi berbasis AI dengan CCTV dan speaker alarm.",
+  "description": "Ubah dua HP menjadi kamera bayi & monitor orang tua dengan deteksi tangisan, alarm, dan jurnal tidur.",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F5F6FA",
-  "theme_color": "#F5F6FA",
+  "background_color": "#0B0D1A",
+  "theme_color": "#0B0D1A",
   "lang": "id",
   "icons": [
     {

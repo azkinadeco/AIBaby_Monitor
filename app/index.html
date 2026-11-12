@@ -1,15 +1,15 @@
 <!doctype html>
-<html lang="id">
+<html lang="id" data-theme="dark">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
-  <meta name="theme-color" content="#F5F6FA">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0B0D1A">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Baby Monitor">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="format-detection" content="telephone=no">
-  <meta name="description" content="AI Baby Monitor — Tidur nyenyak, bayi lebih aman.">
+  <meta name="description" content="AI Baby Monitor — ubah dua HP menjadi kamera bayi & monitor orang tua dengan deteksi tangisan, alarm, dan jurnal tidur.">
   <title>AI Baby Monitor</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
@@ -17,41 +17,21 @@
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" sizes="180x180">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="js/main.js"></script>
 </head>
 <body>
   <div class="stage">
     <div class="device" id="device">
-      <div class="statusbar" id="statusbar">
-        <span id="sb-time">09:41</span>
-        <span class="sb-island"></span>
-        <span class="sb-icons">
-          <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="13.5" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
-          <svg width="16" height="11" viewBox="0 0 24 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 6a14 14 0 0 1 20 0"/><path d="M6 10a8.5 8.5 0 0 1 12 0"/><circle cx="12" cy="14" r="1.4" fill="currentColor"/></svg>
-          <svg width="26" height="12" viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.2" y="2.2" width="16" height="7.6" rx="2" fill="currentColor"/><rect x="23.5" y="4" width="2" height="4" rx="1" fill="currentColor" opacity=".45"/></svg>
-        </span>
-      </div>
-      <div class="net-banner hidden" id="net-banner"></div>
+      <div class="net-banner hidden" id="net-banner" role="status"></div>
       <main id="screen" class="screen"></main>
-      <nav id="tabbar" class="tabbar hidden"></nav>
+      <nav id="tabbar" class="tabbar hidden" aria-label="Navigasi utama"></nav>
       <div id="overlay-root"></div>
-      <div id="toast-root"></div>
-      <button id="sim-fab" class="sim-fab hidden" aria-label="Buka panel simulasi">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6.5L4.6 18.4A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.4-2.6L14 9.5V3"/><path d="M7 15h10"/></svg>
-      </button>
+      <div id="toast-root" aria-live="polite"></div>
     </div>
-    <div class="sim-backdrop" id="sim-backdrop"></div>
-    <aside id="sim-panel" class="sim-panel" aria-label="Panel simulasi"></aside>
+    <aside id="side" class="side hidden" aria-label="Panel simulasi"></aside>
   </div>
-
-  <script src="js/icons.js"></script>
-  <script src="js/store.js"></script>
-  <script src="js/audio.js"></script>
-  <script src="js/camera.js"></script>
-  <script src="js/engine.js"></script>
-  <script src="js/app.js"></script>
-  <script src="js/screens.js"></script>
-  <script src="js/sim.js"></script>
+  <noscript>Aplikasi ini membutuhkan JavaScript.</noscript>
 </body>
 </html>

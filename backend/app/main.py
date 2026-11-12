@@ -9,6 +9,7 @@ Sesuai PRD Bagian 7.3 & 8.1:
   - POST /v1/test-alarm
 """
 import os
+import secrets
 import time
 from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, Header, HTTPException
@@ -45,8 +46,9 @@ STATE: Dict[str, Any] = {
 
 
 def verify_token(x_ingest_token: Optional[str]):
-    if INGEST_TOKEN and x_ingest_token and x_ingest_token != INGEST_TOKEN:
-        raise HTTPException(status_code=401, detail="Invalid X-Ingest-Token")
+    # Sebelumnya permintaan TANPA header token ikut lolos. Sekarang token wajib cocok.
+    if not INGEST_TOKEN or not x_ingest_token or not secrets.compare_digest(x_ingest_token, INGEST_TOKEN):
+        raise HTTPException(status_code=401, detail="Invalid or missing X-Ingest-Token")
 
 
 class HeartbeatPayload(BaseModel):
@@ -156,7 +158,11 @@ def v1_notify(
 
 
 @app.post("/v1/test-alarm")
-def v1_test_alarm(payload: TestAlarmPayload):
+def v1_test_alarm(
+    payload: TestAlarmPayload,
+    x_ingest_token: Optional[str] = Header(default=None),
+):
+    verify_token(x_ingest_token)
     alarm = {
         "speaker_id": payload.speaker_id,
         "sound": payload.sound,
