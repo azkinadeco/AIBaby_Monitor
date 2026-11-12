@@ -41,7 +41,7 @@ function tools() {
 }
 
 route('live', {
-  tab: 'live', dark: true,
+  tab: 'live',
   render() {
     const L = linkLabel();
     const cam = store.s.mode === 'parent' ? (link.baby?.name ? `Kamar ${esc(link.baby.name)}` : 'Kamera bayi') : live.source === 'local' ? 'Kamera perangkat ini' : 'Kamera demo';

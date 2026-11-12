@@ -9,6 +9,7 @@ import { live, sleptBetween } from '../services/monitor.js';
 import { mountFeed } from '../services/feed.js';
 import { control } from '../services/control.js';
 import { TRACKS } from '../services/audio.js';
+import { nightCardHtml, wakeCardHtml, nextFeedText } from './report.js';
 import { statusNow, soundWord, moveWord, eventRow, timeline24, lastCare, linkLabel, sinceText } from './shared.js';
 
 function hero() {
@@ -52,7 +53,7 @@ function careCard() {
   const m = lastCare('milk'), d = lastCare('diaper');
   const item = (c, t, icon, label) => `<div class="care-item">
     <span class="care-ic tone-${t === 'milk' ? 'pri' : 'info'}">${ic(icon, 18)}</span>
-    <span class="care-t"><small>${label}</small><b>${c ? fmtAgo(c.ts) : 'Belum dicatat'}</b>${c ? `<small>${esc(c.detail)}</small>` : ''}</span>
+    <span class="care-t"><small>${label}</small><b>${c ? fmtAgo(c.ts) : 'Belum dicatat'}</b>${c ? `<small>${esc(c.detail)}${t === 'milk' ? ` · ${nextFeedText()}` : ''}</small>` : ''}</span>
     <button class="icon-btn soft sm" data-act="quickCare" data-t="${t}" aria-label="Catat ${label}">${ic('plus', 18)}</button>
   </div>`;
   return item(m, 'milk', 'bottle', 'Susu terakhir') + item(d, 'diaper', 'diaper', 'Popok terakhir');
@@ -96,6 +97,8 @@ route('home', {
       </button>
       <section class="conds" id="home-cond">${conditions()}</section>
       <section class="qas" id="home-qa">${quickActions()}</section>
+      <div id="home-wake">${wakeCardHtml()}</div>
+      ${nightCardHtml()}
       <section class="card care-card" id="home-care">${careCard()}</section>
       <section class="card" id="home-sleep" data-go="journal?tab=sleep" role="button">${sleepCard()}</section>
       <div class="sec-h"><h3>Peringatan terbaru</h3><a data-go="journal">Semua</a></div>
@@ -112,17 +115,21 @@ route('home', {
         if (since && !['offline', 'waiting', 'paused'].includes(statusNow().key)) since.textContent = sinceText().text;
         if (live.temp != null) { const t = $('[data-b=temp]', root), h = $('[data-b=hum]', root); if (t) t.textContent = live.temp; if (h) h.textContent = live.hum; }
       }),
-      bus.on('status', () => set('#home-hero', hero())),
+      bus.on('status', () => { set('#home-hero', hero()); set('#home-wake', wakeCardHtml()); }),
       bus.on('source', () => router.refresh()),
       bus.on('armed', () => set('#home-hero', hero())),
       bus.on('link:state', () => set('#home-hero', hero())),
       bus.on('lullaby', () => set('#home-qa', quickActions())),
       bus.on('care', () => set('#home-care', careCard())),
+      bus.on('sleep', () => set('#home-wake', wakeCardHtml())),
       bus.on('sleep', () => set('#home-sleep', sleepCard())),
       bus.on('events', () => { set('#home-ev', recentEvents()); set('#home-sleep', sleepCard()); }),
     ];
     // napas berubah perlahan → perbarui kecepatan animasi orb sesekali
-    const t = setInterval(() => { const o = $('.orb', root); if (o && live.rpm) o.style.setProperty('--breath', `${((60 / live.rpm) * 2).toFixed(1)}s`); }, 8000);
+    const t = setInterval(() => {
+      const o = $('.orb', root); if (o && live.rpm) o.style.setProperty('--breath', `${((60 / live.rpm) * 2).toFixed(1)}s`);
+      set('#home-wake', wakeCardHtml());   // lama bangun bertambah tiap menit
+    }, 8000);
     return () => { feedOff(); offs.forEach(f => f()); clearInterval(t); };
   },
 });

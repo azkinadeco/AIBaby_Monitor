@@ -128,6 +128,7 @@ function tick() {
   if (store.s.mode !== 'baby') {
     detect(r, src);
     trackSleep();
+    logActivity(r);
   }
   if (isDemo()) simCam.night = sim.forceNight ?? (store.s.settings.nightVision === 'on' || (store.s.settings.nightVision === 'auto' && isNightHour()));
   bus.emit('tick', live);
@@ -229,6 +230,26 @@ export function sleptBetween(from, to = Date.now()) {
     const a = Math.max(from, x.start), b = Math.min(to, x.end || Date.now());
     return b > a ? sum + (b - a) : sum;
   }, 0);
+}
+
+/* ---------------- Log aktivitas per menit (untuk laporan semalam) ---------------- */
+let minute = { m: 0, lv: 0, mo: 0, n: 0, cry: 0 };
+function logActivity(r) {
+  if (!r.online) return;
+  const m = Math.floor(Date.now() / MIN);
+  if (m !== minute.m) {
+    if (minute.n) {
+      const log = store.s.activity;
+      log.push([minute.m, Math.round(minute.lv), Math.round(minute.mo / minute.n), minute.cry]);
+      const cut = m - 48 * 60;
+      while (log.length && log[0][0] < cut) log.shift();
+      store.save();
+    }
+    minute = { m, lv: 0, mo: 0, n: 0, cry: 0 };
+  }
+  minute.lv = Math.max(minute.lv, r.level);
+  minute.mo += r.motion; minute.n++;
+  if (live.status === 'cry') minute.cry = 1;
 }
 
 export function setArmed(v) {

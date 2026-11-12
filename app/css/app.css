@@ -531,6 +531,38 @@ body.night-on .tabbar { display: none; }
 .pin-k.ghost { background: transparent; color: var(--muted); }
 .sheet .pin { padding-top: 8px; }
 
+/* =========================== LAPORAN & WAWASAN =========================== */
+.verdict { display: flex; gap: 14px; align-items: center; padding: 16px; border-radius: var(--r); color: var(--c); background: color-mix(in srgb, var(--c) 12%, var(--bg-2)); border: 1px solid color-mix(in srgb, var(--c) 25%, transparent); }
+.verdict b { display: block; font: 600 19px/1.2 var(--display); color: var(--text); }
+.verdict small { color: var(--muted); font-size: 13px; }
+.act { width: 100%; height: auto; display: block; }
+.act rect { fill: color-mix(in srgb, var(--pri) 45%, transparent); }
+.act rect.loud { fill: color-mix(in srgb, var(--accent) 70%, transparent); }
+.act rect.cry { fill: var(--warn); }
+.act .slp-bg { fill: var(--bg-3); }
+.act .slp { fill: var(--pri); }
+.act .feed { fill: var(--ok); stroke: var(--bg-2); stroke-width: 1.5; }
+.act .ax { stroke: var(--line-2); }
+.act text { fill: var(--faint); font: 600 9.5px var(--sans); }
+.lg-feed { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); }
+.night-card { display: flex; flex-direction: column; gap: 12px; width: 100%; text-align: left; background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--bg-2)), var(--bg-2) 60%); }
+.nc-h { display: flex; align-items: center; gap: 8px; }
+.nc-h b { flex: 1; font-size: 14.5px; }
+.nc-nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.nc-nums b { display: block; font: 600 21px/1.1 var(--display); }
+.nc-nums small { color: var(--muted); font-size: 12px; }
+.wake-card { display: flex; flex-direction: column; gap: 10px; }
+.wc-h { display: flex; align-items: center; gap: 12px; }
+.wc-h > span { width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); flex-shrink: 0; }
+.wc-h small { color: var(--muted); display: block; font-size: 12px; }
+.wc-h b { font: 600 20px/1.1 var(--display); }
+.wc-msg { margin-left: auto; text-align: right; max-width: 52%; color: var(--c) !important; font-weight: 700; }
+.wc-bar { position: relative; height: 8px; border-radius: 6px; background: var(--bg-3); overflow: hidden; }
+.wc-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: var(--c); transition: width .8s var(--ease); }
+.wc-zone { position: absolute; top: 0; bottom: 0; right: 0; background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.care-t em { font-style: normal; font-weight: 700; color: var(--pri); }
+.care-t em.tone-warn { color: var(--warn); }
+
 /* =========================== OVERLAY =========================== */
 #overlay-root { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
 #overlay-root > * { pointer-events: auto; }

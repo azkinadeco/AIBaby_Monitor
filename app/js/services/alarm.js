@@ -32,7 +32,7 @@ export const alarm = {
   get muted() { return muted; },
 };
 
-const quietNow = () => { const q = store.s.settings.alarm.quiet; return q.on && inRange(q.from, q.to); };
+export const quietNow = () => { const q = store.s.settings.alarm.quiet; return q.on && inRange(q.from, q.to); };
 
 function handle(ev) {
   const T = TYPES[ev.type], S = store.s.settings.alarm, name = store.s.baby.name;
@@ -152,16 +152,17 @@ function minimize() {
   $('#overlay-root').appendChild(p);
 }
 
-async function notify(ev) {
+/** Notifikasi sistem — hanya saat aplikasi di latar belakang (di depan sudah ada layar alarm/toast). */
+export async function systemNotify(title, body, { tag = 'aibm', critical = false } = {}) {
   if (!store.s.settings.alarm.notify || !('Notification' in window) || Notification.permission !== 'granted' || !document.hidden) return;
-  const T = TYPES[ev.type];
-  const opts = { body: DESC[ev.type], tag: ev.type, renotify: true, icon: 'assets/icon-192.png', badge: 'assets/favicon-32.png', requireInteraction: ev.level === 'critical', vibrate: [300, 100, 300] };
+  const opts = { body, tag, renotify: true, icon: 'assets/icon-192.png', badge: 'assets/favicon-32.png', requireInteraction: critical, vibrate: [300, 100, 300] };
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
-    if (reg) reg.showNotification(`${T.label} · ${store.s.baby.name}`, opts);
-    else new Notification(`${T.label} · ${store.s.baby.name}`, opts);
+    if (reg) reg.showNotification(title, opts);
+    else new Notification(title, opts);
   } catch { /* tidak didukung */ }
 }
+const notify = ev => systemNotify(`${TYPES[ev.type].label} · ${store.s.baby.name}`, DESC[ev.type], { tag: ev.type, critical: ev.level === 'critical' });
 
 bus.on('alert', handle);
 bus.on('link:restored', () => {

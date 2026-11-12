@@ -11,12 +11,14 @@ import { babyUnit } from './services/babyUnit.js';
 import { applyListen } from './services/control.js';
 import { sim, autoDemo } from './services/sim.js';
 import './services/alarm.js';
+import { startReminders } from './services/reminders.js';
 
 import './screens/home.js';
 import './screens/live.js';
 import './screens/journal.js';
 import './screens/babycam.js';
 import './screens/night.js';
+import './screens/report.js';
 import { demoPanelHtml } from './screens/setup.js';
 import { needsUnlock } from './screens/more.js';
 
@@ -84,6 +86,7 @@ if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) do
 /* ---------- Mulai ---------- */
 applyTheme();
 startMonitor();
+startReminders();
 router.start();
 netBanner();
 applyListen();

@@ -82,7 +82,8 @@ function sleepTab() {
   const maxH = Math.max(rec[1] + 1, ...days.map(d => d.ms / 3600000));
   const longest = store.s.sleep.filter(x => x.end && x.end > Date.now() - 7 * DAY).reduce((a, x) => Math.max(a, x.end - x.start), 0);
   const week = store.s.events.filter(e => e.ts > Date.now() - 7 * DAY && e.level !== 'info');
-  return `<div class="stats">
+  return `<button class="banner" data-go="report">${ic('moonStar', 18)}<span><b>Laporan semalam</b><small>Total tidur, terbangun, menyusu & grafik aktivitas</small></span>${ic('chevR', 18)}</button>
+    <div class="stats">
       <div class="stat"><span class="tone-ok">${ic('moon', 18)}</span><b>${fmtDur(avgMs)}</b><small>rata-rata / hari</small></div>
       <div class="stat"><span class="tone-pri">${ic('bed', 18)}</span><b>${fmtDur(longest)}</b><small>tidur terpanjang</small></div>
       <div class="stat"><span class="tone-warn">${ic('alert', 18)}</span><b>${week.length}</b><small>peringatan 7 hari</small></div>

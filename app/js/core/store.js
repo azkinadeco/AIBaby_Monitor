@@ -36,6 +36,7 @@ function defaults() {
         quiet: { on: false, from: '21:00', to: '05:00' },
         autoSoothe: true, sootheTrack: 'noise', sootheMins: 20,
       },
+      feedEvery: 180,           // pengingat menyusu (menit setelah susu terakhir), 0 = mati
       theme: 'auto',            // auto | light | dark
       nightVision: 'auto',      // auto | on | off (kamera demo)
       pinHash: '',              // kosong = kunci aplikasi nonaktif
@@ -44,6 +45,7 @@ function defaults() {
     events: [],
     care: [],
     sleep: [],                  // sesi tidur [{id, start, end|null}]
+    activity: [],               // per menit: [menit-epoch, level suara, gerakan, menangis 0/1] — 48 jam terakhir
     growth: [],
     milestones: {},
   };
@@ -88,8 +90,24 @@ function seedDemo(s) {
     { id: 'g5', date: isoDaysAgo(6), weight: 6.5, height: 62.6, head: 41.0, note: 'Posyandu' },
   ].map(g => ({ ...g, seed: true }));
   s.milestones = { smile: true, headUp: true, rollOver: true };
+  s.activity = seedActivity(s);
   s.baby.name = 'Aisyah';
   s.baby.demo = true;
+}
+
+/** Aktivitas per menit 30 jam terakhir, konsisten dengan sesi tidur & kejadian contoh */
+function seedActivity(s) {
+  const out = [], now = Math.floor(Date.now() / MIN);
+  const cries = s.events.filter(e => e.type === 'cry').map(e => Math.floor(e.ts / MIN));
+  for (let m = now - 30 * 60; m < now; m++) {
+    const t = m * MIN, asleep = s.sleep.some(x => t >= x.start && t < x.end);
+    const crying = cries.some(c => m >= c && m < c + 4);
+    const r = Math.random();
+    out.push(crying ? [m, 75 + Math.round(r * 12), 35 + Math.round(r * 15), 1]
+      : asleep ? [m, 9 + Math.round(r * 6), r < .06 ? 12 + Math.round(r * 100) : Math.round(r * 4), 0]
+        : [m, 22 + Math.round(r * 16), 14 + Math.round(r * 22), 0]);
+  }
+  return out;
 }
 
 function isObj(v) { return v && typeof v === 'object' && !Array.isArray(v); }
@@ -180,6 +198,7 @@ export const store = {
   /** Hapus semua data contoh (dipakai saat mulai memantau bayi sungguhan). */
   clearSeed() {
     for (const k of ['events', 'care', 'sleep', 'growth']) s[k] = s[k].filter(x => !x.seed);
+    s.activity = [];
     if (s.baby.demo) { s.baby = { ...s.baby, name: 'Si Kecil', photo: null, demo: false }; s.milestones = {}; }
     this.save();
     bus.emit('events'); bus.emit('care'); bus.emit('sleep');

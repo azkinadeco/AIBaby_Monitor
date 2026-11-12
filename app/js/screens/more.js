@@ -128,6 +128,12 @@ route('settings', {
           ${seg('settings.alarm.sootheMins', [[10, '10m'], [20, '20m'], [45, '45m']], A.sootheMins, { num: true })}</div>` : ''}
       </div>
 
+      <div class="sec-h"><h3>${ic('bottle', 16)} Pengingat menyusu</h3></div>
+      <div class="card">
+        ${row('Ingatkan setelah susu terakhir', 'Toast, getar & suara lembut — bukan alarm darurat', '')}
+        ${seg('settings.feedEvery', [[0, 'Mati'], [120, '2 j'], [150, '2,5 j'], [180, '3 j'], [240, '4 j']], S.feedEvery, { num: true })}
+      </div>
+
       <div class="sec-h"><h3>${ic('sun', 16)} Tampilan</h3></div>
       ${opts('settings.theme', [['auto', 'sparkles', 'Otomatis'], ['light', 'sun', 'Terang'], ['dark', 'moon', 'Gelap']], S.theme)}
       <p class="fine">Otomatis = gelap pukul 18.00–06.00, nyaman dilihat di kamar tidur.</p>
