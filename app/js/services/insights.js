@@ -81,3 +81,30 @@ export function nextFeed() {
   if (!every || !last) return null;
   return { last, at: last.ts + every * MIN, due: Date.now() >= last.ts + every * MIN };
 }
+
+/* ---------------- Tren mingguan: 7 hari terakhir vs 7 hari sebelumnya ---------------- */
+function weekStats(from) {
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d0 = from + i * DAY;
+    const sess = store.s.sleep.filter(x => x.end && x.start >= d0 && x.start < d0 + DAY);
+    if (!sess.length) continue;                                       // hari tanpa data tidak dihitung
+    const nightStart = d0 + 18 * HOUR, nightEnd = d0 + DAY + 7 * HOUR;
+    // tidur malam = sesi pertama yang mulai 18.00–02.00 dan cukup panjang (bukan tidur siang sore)
+    const bed = store.s.sleep.filter(x => x.end && x.start >= nightStart && x.start < d0 + DAY + 2 * HOUR && x.end - x.start >= 90 * MIN).sort((a, b) => a.start - b.start)[0];
+    days.push({
+      total: sleptBetween(d0, d0 + DAY),
+      night: sleptBetween(nightStart, nightEnd),
+      naps: sess.filter(x => { const h = new Date(x.start).getHours(); return h >= 7 && h < 18; }).length,
+      bed: bed ? (bed.start - d0) / MIN : null,                         // menit sejak 00.00 hari itu (bisa > 1440)
+    });
+  }
+  const mean = k => { const v = days.map(d => d[k]).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  return { n: days.length, total: mean('total'), night: mean('night'), naps: mean('naps'), bed: mean('bed') };
+}
+
+export function weeklyTrend() {
+  const day0 = new Date(); day0.setHours(0, 0, 0, 0);
+  const cur = weekStats(day0.getTime() - 7 * DAY), prev = weekStats(day0.getTime() - 14 * DAY);
+  return { cur, prev, comparable: cur.n >= 3 && prev.n >= 3 };
+}

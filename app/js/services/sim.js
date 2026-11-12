@@ -84,11 +84,14 @@ const off = document.createElement('canvas');
 off.width = W; off.height = H;
 const c = off.getContext('2d');
 const targets = new Set();
+let holds = 0;
 let breathPhase = 0, lastT = 0, lastFrame = 0, night = false, label = '';
 
 export const simCam = {
   W, H, canvas: off,
   attach(cv) { targets.add(cv); return () => targets.delete(cv); },
+  /** Tetap menggambar walau tidak ditampilkan (dipakai perekam klip). */
+  hold() { holds++; return () => { holds = Math.max(0, holds - 1); }; },
   set night(v) { night = v; },
   get night() { return night; },
   set label(v) { label = v; },
@@ -306,7 +309,8 @@ function draw(t) {
 
 function loop(ts) {
   requestAnimationFrame(loop);
-  if (!targets.size || document.hidden || ts - lastFrame < 50) { if (!targets.size) lastT = ts / 1000; return; }   // ±20 fps, hanya saat terlihat
+  const busy = targets.size || holds;
+  if (!busy || document.hidden || ts - lastFrame < 50) { if (!busy) lastT = ts / 1000; return; }   // ±20 fps, hanya saat dibutuhkan
   lastFrame = ts;
   draw(ts / 1000);
   targets.forEach(cv => {

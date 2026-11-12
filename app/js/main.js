@@ -11,7 +11,9 @@ import { babyUnit } from './services/babyUnit.js';
 import { applyListen } from './services/control.js';
 import { sim, autoDemo } from './services/sim.js';
 import './services/alarm.js';
+import './services/sync.js';
 import { startReminders } from './services/reminders.js';
+import { startClips } from './services/clips.js';
 
 import './screens/home.js';
 import './screens/live.js';
@@ -87,6 +89,7 @@ if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) do
 applyTheme();
 startMonitor();
 startReminders();
+startClips();
 router.start();
 netBanner();
 applyListen();

@@ -1,5 +1,5 @@
 /* JURNAL — riwayat kejadian, catatan perawatan, statistik tidur, dan tumbuh kembang. */
-import { $, esc, fmtTime, fmtDay, fmtDur, fmtTimeS, HARI, DAY, babyMonths, babyAge, isToday, download } from '../core/util.js';
+import { $, esc, fmtTime, fmtDay, fmtDur, fmtTimeS, HARI, DAY, MIN, babyMonths, babyAge, isToday, download } from '../core/util.js';
 import { ic } from '../core/icons.js';
 import { store } from '../core/store.js';
 import { bus } from '../core/bus.js';
@@ -7,6 +7,8 @@ import { route, router } from '../core/router.js';
 import { actions, sheet, closeSheet, toast, confirmBox, topbar, empty } from '../core/ui.js';
 import { TYPES, sleptBetween } from '../services/monitor.js';
 import { DESC } from '../services/alarm.js';
+import { getClip, deleteClip } from '../services/clips.js';
+import { weeklyTrend } from '../services/insights.js';
 import { eventRow, groupByDay, timeline24, CARE, levelTone, levelLabel } from './shared.js';
 
 const TABS = [['events', 'bell', 'Kejadian'], ['care', 'heart', 'Rawat'], ['sleep', 'moon', 'Tidur'], ['growth', 'ruler', 'Tumbuh']];
@@ -64,8 +66,7 @@ function careTab() {
 }
 actions.delCare = async el => {
   if (!await confirmBox('Hapus catatan?', 'Catatan ini akan dihapus dari jurnal.', 'Hapus', true)) return;
-  store.s.care = store.s.care.filter(c => c.id !== el.dataset.id);
-  store.save(); bus.emit('care');
+  store.removeCare(el.dataset.id);
 };
 
 /* ---------------- Tidur (dihitung dari sesi tidur nyata) ---------------- */
@@ -97,6 +98,7 @@ function sleepTab() {
           <small>${i === 6 ? 'Kini' : HARI[new Date(d.from).getDay()].slice(0, 3)}</small></div>`;
       }).join('')}</div>
     </div>
+    ${trendCard()}
     <div class="card"><div class="card-h"><b>24 jam terakhir</b></div>${timeline24()}</div>
     <div class="sec-h"><h3>Sesi tidur</h3></div>
     <div class="card list">${store.s.sleep.slice(-8).reverse().map(x => `<div class="row">
@@ -104,6 +106,31 @@ function sleepTab() {
       <span class="row-main"><b>${fmtTime(x.start)} – ${x.end ? fmtTime(x.end) : 'sekarang'}</b><small>${fmtDay(x.start)}</small></span>
       <b class="mono">${fmtDur((x.end || Date.now()) - x.start)}</b></div>`).join('') || `<p class="muted small pad-s">Sesi tidur tercatat otomatis saat bayi tenang beberapa menit.</p>`}</div>
     <button class="btn btn-soft btn-lg" data-act="printReport">${ic('download', 18)} Laporan untuk dokter anak (PDF)</button>`;
+}
+
+/** Perbandingan minggu ini vs minggu lalu dalam kalimat sederhana */
+function trendCard() {
+  const { cur, prev, comparable } = weeklyTrend();
+  if (cur.n < 3) return '';
+  const clock = m => { const x = ((Math.round(m) % 1440) + 1440) % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}.${String(x % 60).padStart(2, '0')}`; };
+  const row = (icon, title, val, d, unit, goodUp, fmtD) => {
+    let tag = '';
+    if (comparable && d != null) {
+      const tiny = Math.abs(d) < (unit === 'min' ? 10 : unit === 'x' ? .5 : 15 * MIN);
+      const tone = tiny ? 'muted' : (d > 0) === goodUp ? 'ok' : 'warn';
+      tag = `<span class="trend-d tone-${tone}">${tiny ? 'stabil' : `${d > 0 ? '▲' : '▼'} ${fmtD(Math.abs(d))}`}</span>`;
+    }
+    return `<div class="row"><span class="row-ic tone-pri">${ic(icon, 16)}</span><span class="row-main"><b>${val}</b><small>${title}</small></span>${tag}</div>`;
+  };
+  const diff = k => (cur[k] != null && prev[k] != null ? cur[k] - prev[k] : null);
+  const bedD = diff('bed');
+  return `<div class="card trend">
+    <div class="card-h"><b>${ic('chart', 16)} Tren 7 hari</b><small>${comparable ? 'dibanding minggu lalu' : 'butuh data minggu lalu untuk perbandingan'}</small></div>
+    ${row('moon', 'tidur per hari', fmtDur(cur.total), diff('total'), 'ms', true, fmtDur)}
+    ${row('moonStar', 'tidur malam (18.00–07.00)', fmtDur(cur.night), diff('night'), 'ms', true, fmtDur)}
+    ${cur.bed != null ? row('bed', 'rata-rata mulai tidur malam', clock(cur.bed), bedD, 'min', false, m => `${Math.round(m)} mnt ${bedD > 0 ? 'lebih larut' : 'lebih awal'}`) : ''}
+    ${row('sun', 'tidur siang per hari', `${cur.naps.toFixed(1).replace('.', ',')}×`, diff('naps'), 'x', true, x => `${x.toFixed(1).replace('.', ',')}×`)}
+  </div>`;
 }
 
 /* ---------------- Tumbuh kembang ---------------- */
@@ -196,10 +223,12 @@ route('event', {
     if (e.level !== 'info') steps.push([e.ts + 600, 'volume', 'Alarm berbunyi']);
     if (e.soothed) steps.push([e.ts + 900, 'music', 'Penenang otomatis diputar']);
     if (e.ack && e.level !== 'info') steps.push([e.ts + (e.ackSec || 0) * 1000, 'check', `Dicek ${esc(e.ackBy || '')}`]);
+    steps.sort((a, b) => a[0] - b[0]);
     const pend = !e.ack && e.level !== 'info';
     const m = e.metrics || {};
     return topbar(levelLabel(e.level)) + `<div class="stack">
-      <div class="snap">${e.snap ? `<img src="${e.snap}" alt="Cuplikan kamera saat kejadian">` : `<div class="snap-ph">${ic('cctv', 36)}<small>Tidak ada cuplikan</small></div>`}</div>
+      <div class="snap" id="ev-media">${e.snap ? `<img src="${e.snap}" alt="Cuplikan kamera saat kejadian">` : `<div class="snap-ph">${ic('cctv', 36)}<small>Tidak ada cuplikan</small></div>`}
+        ${e.clip ? `<span class="clip-tag">${ic('video', 12)} Klip tersedia</span>` : ''}</div>
       <div class="ev-title"><span class="row-ic lg tone-${levelTone(e.level)}">${ic(T.icon, 22)}</span><div><h2>${T.label}</h2><small>${fmtDay(e.ts)} · ${fmtTime(e.ts)}</small></div></div>
       <p class="muted">${DESC[e.type] || ''}</p>
       ${e.metrics ? `<div class="chips">
@@ -213,9 +242,34 @@ route('event', {
         ${e.level !== 'info' ? `<button class="btn btn-soft" data-act="toggleFalse" data-id="${e.id}">${ic('flag', 16)} ${e.falseAlarm ? 'Bukan alarm palsu' : 'Alarm palsu'}</button>` : ''}
         <button class="btn btn-soft danger" data-act="delEvent" data-id="${e.id}">${ic('trash', 16)} Hapus</button>
       </div>
+      ${e.clip ? `<button class="btn btn-ghost" data-act="dlClip" data-id="${e.id}">${ic('download', 16)} Unduh klip video</button>` : ''}
     </div>`;
   },
+  mount(root, { id }) {
+    const e = store.s.events.find(x => x.id === id);
+    if (!e?.clip) return null;
+    let urls = [], alive = true;
+    // putar potongan klip berurutan: sebelum kejadian → sesudah kejadian
+    getClip(id).then(c => {
+      if (!alive || !c?.parts?.length) return;
+      urls = c.parts.map(b => URL.createObjectURL(b));
+      const box = $('#ev-media', root);
+      box.innerHTML = `<video class="clip" controls playsinline autoplay muted></video><span class="clip-tag">${ic('video', 12)} Klip ${c.parts.length > 1 ? 'sebelum & sesudah' : ''} kejadian</span>`;
+      const v = box.querySelector('video');
+      let i = 0;
+      v.src = urls[0];
+      v.onended = () => { if (++i < urls.length) { v.src = urls[i]; v.play().catch(() => {}); } else i = 0; };
+      v.onclick = () => { v.muted = false; };
+    });
+    return () => { alive = false; urls.forEach(u => URL.revokeObjectURL(u)); };
+  },
 });
+actions.dlClip = async el => {
+  const c = await getClip(el.dataset.id);
+  if (!c) { toast('Klip tidak ditemukan', { icon: 'alert', tone: 'warn' }); return; }
+  const ext = c.mime?.includes('mp4') ? 'mp4' : 'webm';
+  c.parts.forEach((b, i) => download(b, `klip-${store.s.baby.name.toLowerCase()}-${new Date(c.ts).toISOString().slice(0, 16).replace(':', '')}-${i + 1}.${ext}`));
+};
 actions.toggleFalse = el => {
   const e = store.s.events.find(x => x.id === el.dataset.id);
   if (!e) return;
@@ -226,6 +280,7 @@ actions.toggleFalse = el => {
 actions.delEvent = async el => {
   if (!await confirmBox('Hapus kejadian?', 'Catatan & cuplikan dihapus permanen.', 'Hapus', true)) return;
   store.s.events = store.s.events.filter(x => x.id !== el.dataset.id);
+  deleteClip(el.dataset.id);
   store.save(); bus.emit('events'); router.back();
 };
 

@@ -8,8 +8,13 @@ export const bus = {
     return () => listeners.get(ev)?.delete(fn);
   },
   emit(ev, data) {
-    listeners.get(ev)?.forEach(fn => {
+    const set = listeners.get(ev);
+    if (!set) return;
+    // Iterasi atas salinan: pendengar boleh melepas diri / memasang pendengar baru (mis. layar render ulang)
+    // tanpa membuat loop tak berujung. Pendengar yang sudah dilepas di tengah jalan dilewati.
+    for (const fn of [...set]) {
+      if (!set.has(fn)) continue;
       try { fn(data); } catch (e) { console.error(`[bus:${ev}]`, e); }
-    });
+    }
   },
 };

@@ -563,6 +563,14 @@ body.night-on .tabbar { display: none; }
 .care-t em { font-style: normal; font-weight: 700; color: var(--pri); }
 .care-t em.tone-warn { color: var(--warn); }
 
+/* klip kejadian & tren */
+.snap { position: relative; }
+.snap video.clip { width: 100%; height: 100%; object-fit: cover; background: #000; display: block; }
+.clip-tag { position: absolute; left: 10px; top: 10px; display: inline-flex; gap: 5px; align-items: center; padding: 4px 9px; border-radius: 8px; background: rgba(0, 0, 0, .55); color: #fff; font-size: 11.5px; font-weight: 700; pointer-events: none; }
+.trend .row { padding: 10px 0; }
+.trend .row + .row { border-top: 1px solid var(--line); }
+.trend-d { font-size: 12.5px; font-weight: 800; white-space: nowrap; color: var(--c, var(--muted)); }
+
 /* =========================== OVERLAY =========================== */
 #overlay-root { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
 #overlay-root > * { pointer-events: auto; }

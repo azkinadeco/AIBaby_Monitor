@@ -82,6 +82,8 @@ export const link = {
 
   /** Kirim perintah ke kamera bayi (lagu, bicara, volume). */
   cmd(a, data = {}) { return send({ t: 'cmd', a, ...data }); },
+  /** Kirim pesan data ke kamera bayi (dipakai sinkron jurnal). */
+  send(msg) { return send(msg); },
 
   /** Tahan untuk bicara: ganti jalur audio senyap dengan mikrofon. */
   async talk(on) {
@@ -188,6 +190,7 @@ function onParentData(m) {
     case 'r': link.lastReading = { ...m, ts: Date.now() }; break;
     case 'pong': link.latency = Math.round((Date.now() - m.ts) / 2); break;
     case 'lull': link.babyLull = m; bus.emit('link:lull', m); break;
+    case 'care': bus.emit('link:care', m); break;
   }
 }
 
@@ -234,6 +237,7 @@ function onBabyData(c, m) {
   if (!link.parents.has(id)) return;                 // belum terverifikasi
   if (m.t === 'ping') { try { c.send({ t: 'pong', ts: m.ts }); } catch { /* */ } }
   else if (m.t === 'cmd') bus.emit('link:cmd', { ...m, from: link.parents.get(id).name });
+  else if (m.t === 'care') bus.emit('link:care', m);
 }
 
 function dropParent(id, silentDrop = false) {

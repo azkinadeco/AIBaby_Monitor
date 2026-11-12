@@ -23,6 +23,11 @@ Belum punya HP kedua? Pilih **Coba dulu (mode demo)** — bayi simulasi dengan p
 | **Alarm** | Layar penuh, sirene/lonceng + suara Bahasa Indonesia, getar, notifikasi sistem, jam tenang. Alarm khusus bila **kamera terputus** atau **baterai kamera lemah**. |
 | **Penenang otomatis** | White noise, detak jantung ibu, hujan, Nina Bobo, Brahms, Twinkle — diputar **di speaker HP kamera** saat bayi menangis; bisa juga dikendalikan manual + timer. |
 | **Bicara ke bayi** | Tahan tombol untuk bicara (mikrofon HP orang tua → speaker kamera) atau putar kalimat siap pakai. |
+| **Klip video kejadian** | Saat peringatan, HP orang tua menyimpan video ±20 dtk sebelum & 10 dtk sesudah kejadian (di perangkat, 30 terbaru) — bisa diputar & diunduh di detail kejadian. |
+| **Jurnal bersama** | Catatan susu/popok/suhu tersinkron otomatis ke semua HP orang tua lewat HP kamera bayi (tanpa server), termasuk penghapusan. |
+| **Laporan semalam** | Total tidur, terbangun, tidur terpanjang, menyusu & grafik aktivitas suara 18.00–07.00; bisa dibagikan ke pasangan. |
+| **Jendela tidur & pengingat menyusu** | Perkiraan kapan bayi sebaiknya ditidurkan lagi sesuai usia; pengingat lembut saat jadwal menyusu tiba. |
+| **Tren mingguan** | 7 hari terakhir vs minggu lalu: tidur per hari, tidur malam, jam mulai tidur, tidur siang. |
 | **Sesi tidur otomatis** | Tercatat saat bayi tenang beberapa menit; timeline 24 jam, grafik 7 hari dengan rentang anjuran sesuai usia. |
 | **Jurnal** | Susu, popok, suhu, obat; tumbuh kembang dengan kurva berat badan vs median WHO; milestone; ekspor CSV & laporan PDF untuk dokter anak. |
 | **Lainnya** | Mode gelap otomatis (18.00–06.00), kunci PIN (tersimpan sebagai hash), PWA bisa dipasang ke layar utama, rekam/foto/jendela mengambang. |
@@ -57,7 +62,11 @@ app/
     ui.js                   toast, bottom sheet, konfirmasi, tema, delegasi data-act / data-go
     bus.js · icons.js
   js/services/
-    monitor.js              OTAK: bacaan sensor → status bayi → kejadian → sesi tidur
+    monitor.js              OTAK: bacaan sensor → status bayi → kejadian → sesi tidur → log aktivitas
+    insights.js             laporan semalam, jendela tidur, jadwal menyusu, tren mingguan
+    clips.js                perekam berputar + penyimpanan klip kejadian (IndexedDB)
+    sync.js                 jurnal bersama antar-HP orang tua lewat HP kamera
+    reminders.js            pengingat menyusu
     detector.js             analisis mikrofon & kamera di perangkat (tangisan, gerakan)
     link.js                 WebRTC/PeerJS: pairing, video, perintah, tahan-untuk-bicara
     babyUnit.js             logika HP kamera bayi (kode pairing, baterai, perintah dari orang tua)
@@ -66,7 +75,7 @@ app/
     audio.js                sirene, TTS Bahasa Indonesia, lagu & white noise (Web Audio)
     sim.js                  bayi simulasi untuk mode demo
     feed.js                 menampilkan gambar kamera dari sumber aktif
-  js/screens/               home, live, journal, babycam, night, setup, more, shared
+  js/screens/               home, live, journal, report, babycam, night, setup, more, shared
 backend/                    contoh API FastAPI sesuai PRD (untuk integrasi CCTV/gateway nanti)
 ```
 

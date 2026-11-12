@@ -6,6 +6,7 @@ import { route, router } from '../core/router.js';
 import { actions, sheet, closeSheet, toast, topbar, toggle, seg, babyAvatar, disclaimer, applyTheme } from '../core/ui.js';
 import { TYPES } from '../services/monitor.js';
 import { TRACKS, testAlarm } from '../services/audio.js';
+import { clipsSupported } from '../services/clips.js';
 import { linkLabel } from './shared.js';
 
 /* ================= Menu ================= */
@@ -115,6 +116,7 @@ route('settings', {
       <div class="card">
         ${row('Suara peringatan', `“${esc(TYPES.cry.speak(store.s.baby.name))}”`, toggle('settings.alarm.voice', A.voice, { label: 'Suara peringatan' }))}
         ${row('Getar', '', toggle('settings.alarm.vibrate', A.vibrate, { label: 'Getar' }))}
+        ${clipsSupported() ? row('Simpan klip video kejadian', '±20 dtk sebelum & 10 dtk sesudah, disimpan di HP ini (30 terbaru)', toggle('settings.clips', S.clips !== false, { label: 'Klip video' })) : ''}
         ${row('Notifikasi sistem', 'Saat aplikasi di latar belakang', toggle('settings.alarm.notify', A.notify, { after: 'askNotify', label: 'Notifikasi' }))}
         ${row('Jam tenang', 'Peringatan ringan tanpa bunyi. Darurat tetap berbunyi.', toggle('settings.alarm.quiet.on', A.quiet.on, { after: 'rerender', label: 'Jam tenang' }))}
         ${A.quiet.on ? `<div class="times">${ic('moon', 16)}<input type="time" value="${A.quiet.from}" data-set="settings.alarm.quiet.from" aria-label="Mulai"><span>–</span><input type="time" value="${A.quiet.to}" data-set="settings.alarm.quiet.to" aria-label="Selesai"></div>` : ''}

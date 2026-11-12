@@ -112,7 +112,8 @@ function tick() {
   live.latency = src === 'remote' ? link.latency : null;
 
   let next = classify(r);
-  if (src === 'remote' && link.state !== 'connected' && !offlineSince && !linkAlerted) next = 'waiting';
+  // belum tersambung, atau sudah tersambung tapi data pertama belum tiba → "Menyambungkan…", bukan "terputus"
+  if (src === 'remote' && !r.online && (link.state !== 'connected' || !link.lastReading) && !offlineSince && !linkAlerted) next = 'waiting';
   // status bayi berubah hanya jika kondisi baru bertahan beberapa detik (hindari kedip-kedip)
   if (next === live.status) candN = 0;
   else {

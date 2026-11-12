@@ -36,6 +36,7 @@ function defaults() {
         quiet: { on: false, from: '21:00', to: '05:00' },
         autoSoothe: true, sootheTrack: 'noise', sootheMins: 20,
       },
+      clips: true,              // simpan klip video saat kejadian (di perangkat ini)
       feedEvery: 180,           // pengingat menyusu (menit setelah susu terakhir), 0 = mati
       theme: 'auto',            // auto | light | dark
       nightVision: 'auto',      // auto | on | off (kamera demo)
@@ -45,6 +46,8 @@ function defaults() {
     events: [],
     care: [],
     sleep: [],                  // sesi tidur [{id, start, end|null}]
+    careDeleted: [],
+    clips: [],                  // id kejadian yang punya klip video (terbaru dulu)            // id catatan yang dihapus (agar tidak muncul lagi saat sinkron antar-HP)
     activity: [],               // per menit: [menit-epoch, level suara, gerakan, menangis 0/1] — 48 jam terakhir
     growth: [],
     milestones: {},
@@ -71,13 +74,15 @@ function seedDemo(s) {
   // sesi tidur 7 hari terakhir (malam + tidur siang)
   const sleep = [];
   const day0 = new Date(); day0.setHours(0, 0, 0, 0);
-  for (let d = 7; d >= 0; d--) {
+  for (let d = 14; d >= 0; d--) {
     const base = day0.getTime() - d * DAY;
     // jam relatif terhadap tengah malam: tidur malam (terpotong menyusu) + 3 kali tidur siang ≈ 13–14 jam/hari
     const plan = [[-4.6, -0.5], [0.1, 3.2], [3.6, 6.4], [9.2, 10.6], [13.1, 14.6], [17.0, 17.8]];
     plan.forEach(([a, b], i) => {
       const j = Math.sin(d * 7 + i) * 0.2;
-      const start = base + (a + j) * HOUR, end = base + (b + j * 0.5) * HOUR;
+      // minggu lalu: mulai tidur malam ±25 menit lebih larut (agar tren mingguan terlihat di demo)
+      const late = d > 7 && i === 0 ? 0.42 : 0;
+      const start = base + (a + j + late) * HOUR, end = base + (b + j * 0.5) * HOUR;
       if (end < now - 10 * MIN) sleep.push({ id: 's' + uid(), start, end, seed: true });
     });
   }
@@ -189,7 +194,36 @@ export const store = {
     s.care.unshift(item);
     this.save();
     bus.emit('care');
+    bus.emit('care:add', item);
     return item;
+  },
+  removeCare(id) {
+    s.care = s.care.filter(c => c.id !== id);
+    s.careDeleted = [id, ...s.careDeleted.filter(x => x !== id)].slice(0, 300);
+    this.save();
+    bus.emit('care');
+    bus.emit('care:del', id);
+  },
+  /** Gabungkan catatan dari HP lain. Idempoten: aman diterima berulang kali. */
+  mergeCare(items = [], deleted = []) {
+    let changed = false;
+    const gone = new Set([...s.careDeleted, ...deleted]);
+    if (deleted.length) {
+      const known = new Set(s.careDeleted);
+      changed = deleted.some(id => !known.has(id));
+      s.careDeleted = [...new Set([...deleted, ...s.careDeleted])].slice(0, 300);
+      const n = s.care.length;
+      s.care = s.care.filter(c => !gone.has(c.id));
+      changed ||= s.care.length !== n;
+    }
+    const have = new Set(s.care.map(c => c.id));
+    for (const c of items) {
+      if (!c?.id || have.has(c.id) || gone.has(c.id) || !c.type || !c.ts) continue;
+      s.care.push({ id: String(c.id), type: String(c.type), detail: String(c.detail || '').slice(0, 60), ts: +c.ts, by: String(c.by || '').slice(0, 20) });
+      changed = true;
+    }
+    if (changed) { s.care.sort((a, b) => b.ts - a.ts); this.save(); bus.emit('care'); }
+    return changed;
   },
   /** Peringatan yang belum dicek orang tua */
   unread() { return s.events.filter(e => !e.ack && e.level !== 'info').length; },
