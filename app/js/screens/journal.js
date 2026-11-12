@@ -9,7 +9,7 @@ import { TYPES, sleptBetween } from '../services/monitor.js';
 import { DESC } from '../services/alarm.js';
 import { getClip, deleteClip } from '../services/clips.js';
 import { weeklyTrend } from '../services/insights.js';
-import { eventRow, groupByDay, timeline24, CARE, levelTone, levelLabel } from './shared.js';
+import { eventRow, groupByDay, CARE, levelTone, levelLabel } from './shared.js';
 
 const TABS = [['events', 'bell', 'Kejadian'], ['care', 'heart', 'Rawat'], ['sleep', 'moon', 'Tidur'], ['growth', 'ruler', 'Tumbuh']];
 
@@ -36,11 +36,10 @@ function eventsTab(f) {
   let list = store.s.events;
   if (f === 'alert') list = list.filter(e => e.level !== 'info');
   const pending = store.s.events.filter(e => !e.ack && e.level !== 'info').length;
-  return `${pending ? `<button class="banner warn" data-act="ackAll">${ic('alert', 18)}<span><b>${pending} peringatan belum dicek</b><small>Ketuk untuk konfirmasi semua</small></span></button>` : ''}
+  return `${pending ? `<button class="banner warn" data-act="ackAll">${ic('alert', 18)}<span><b>${pending} belum dicek</b></span><span class="banner-act">Tandai semua</span></button>` : ''}
     <div class="chips">
       <button class="chip ${f === 'alert' ? 'on' : ''}" data-go="journal?tab=events&f=alert" data-replace>Peringatan</button>
       <button class="chip ${f === 'all' ? 'on' : ''}" data-go="journal?tab=events&f=all" data-replace>Semua</button>
-      <button class="chip end" data-act="exportCsv">${ic('download', 13)} CSV</button>
     </div>
     ${groupByDay(list).map(g => `<div class="day-h">${g.d}</div><div class="card list">${g.items.map(eventRow).join('')}</div>`).join('') || empty('bell', 'Belum ada kejadian')}`;
 }
@@ -50,23 +49,29 @@ function careTab() {
   const list = store.s.care, today = list.filter(c => isToday(c.ts));
   const cnt = t => today.filter(c => c.type === t).length;
   const ml = today.filter(c => c.type === 'milk').reduce((a, c) => a + (parseInt(c.detail, 10) || 0), 0);
-  return `<div class="stats">
-      <div class="stat"><span class="tone-pri">${ic('bottle', 18)}</span><b>${cnt('milk')}×</b><small>susu hari ini${ml ? ` · ${ml} ml` : ''}</small></div>
-      <div class="stat"><span class="tone-info">${ic('diaper', 18)}</span><b>${cnt('diaper')}×</b><small>popok hari ini</small></div>
+  return `<div class="sum card">
+      <div><span class="tone-pri">${ic('bottle', 18)}</span><b>${cnt('milk')}×</b><small>${ml ? `${ml} ml` : 'susu'}</small></div>
+      <div><span class="tone-info">${ic('diaper', 18)}</span><b>${cnt('diaper')}×</b><small>popok</small></div>
+      <div><span class="tone-ok">${ic('moon', 18)}</span><b>${fmtDur(sleptBetween(new Date().setHours(0, 0, 0, 0)))}</b><small>tidur</small></div>
     </div>
     <div class="care-quick">${Object.entries(CARE).map(([k, v]) => `<button class="care-type tone-${v.tone}" data-act="care" data-t="${k}"><span>${ic(v.icon, 20)}</span><small>${v.label}</small></button>`).join('')}</div>
     ${groupByDay(list).map(g => `<div class="day-h">${g.d}</div><div class="card list">${g.items.map(c => {
       const T = CARE[c.type] || CARE.med;
-      return `<div class="row">
+      return `<button class="row" data-act="careItem" data-id="${c.id}">
         <span class="row-ic tone-${T.tone}">${ic(T.icon, 18)}</span>
-        <span class="row-main"><b>${T.label} · ${esc(c.detail)}</b><small>${fmtTime(c.ts)} · ${esc(c.by || '')}</small></span>
-        <button class="icon-btn sm" data-act="delCare" data-id="${c.id}" aria-label="Hapus">${ic('trash', 15)}</button>
-      </div>`;
+        <span class="row-main"><b>${T.label}</b><small>${esc(c.detail)}${c.by ? ` · ${esc(c.by)}` : ''}</small></span>
+        <span class="row-time">${fmtTime(c.ts)}</span>
+      </button>`;
     }).join('')}</div>`).join('') || empty('heart', 'Belum ada catatan perawatan')}`;
 }
-actions.delCare = async el => {
-  if (!await confirmBox('Hapus catatan?', 'Catatan ini akan dihapus dari jurnal.', 'Hapus', true)) return;
-  store.removeCare(el.dataset.id);
+/** Ketuk catatan → hapus (bisa diurungkan) */
+actions.careItem = async el => {
+  const c = store.s.care.find(x => x.id === el.dataset.id);
+  if (!c) return;
+  const T = CARE[c.type] || CARE.med;
+  if (!await confirmBox(`Hapus ${T.label.toLowerCase()} ${fmtTime(c.ts)}?`, esc(c.detail), 'Hapus', true)) return;
+  store.removeCare(c.id);
+  toast('Catatan dihapus', { icon: 'trash', action: { label: 'Urungkan', fn: () => store.addCare(c.type, c.detail, c.ts, c.by) } });
 };
 
 /* ---------------- Tidur (dihitung dari sesi tidur nyata) ---------------- */
@@ -83,14 +88,14 @@ function sleepTab() {
   const maxH = Math.max(rec[1] + 1, ...days.map(d => d.ms / 3600000));
   const longest = store.s.sleep.filter(x => x.end && x.end > Date.now() - 7 * DAY).reduce((a, x) => Math.max(a, x.end - x.start), 0);
   const week = store.s.events.filter(e => e.ts > Date.now() - 7 * DAY && e.level !== 'info');
-  return `<button class="banner" data-go="report">${ic('moonStar', 18)}<span><b>Laporan semalam</b><small>Total tidur, terbangun, menyusu & grafik aktivitas</small></span>${ic('chevR', 18)}</button>
-    <div class="stats">
-      <div class="stat"><span class="tone-ok">${ic('moon', 18)}</span><b>${fmtDur(avgMs)}</b><small>rata-rata / hari</small></div>
-      <div class="stat"><span class="tone-pri">${ic('bed', 18)}</span><b>${fmtDur(longest)}</b><small>tidur terpanjang</small></div>
-      <div class="stat"><span class="tone-warn">${ic('alert', 18)}</span><b>${week.length}</b><small>peringatan 7 hari</small></div>
+  return `<button class="banner" data-go="report">${ic('moonStar', 18)}<span><b>Laporan semalam</b></span>${ic('chevR', 18)}</button>
+    <div class="sum card">
+      <div><span class="tone-ok">${ic('moon', 18)}</span><b>${fmtDur(avgMs)}</b><small>rata-rata</small></div>
+      <div><span class="tone-pri">${ic('bed', 18)}</span><b>${fmtDur(longest)}</b><small>terpanjang</small></div>
+      <div><span class="tone-warn">${ic('alert', 18)}</span><b>${week.length}</b><small>peringatan</small></div>
     </div>
     <div class="card">
-      <div class="card-h"><b>Durasi tidur 7 hari</b><small>area hijau = anjuran usia ${Math.floor(m)} bln (${rec[0]}–${rec[1]} j)</small></div>
+      <div class="card-h"><b>7 hari</b><small><i class="lg-rec"></i>anjuran ${rec[0]}–${rec[1]} j</small></div>
       <div class="cols">${days.map((d, i) => {
         const h = d.ms / 3600000;
         return `<div class="col ${i === 6 ? 'today' : ''}"><em>${h ? h.toFixed(1) : '–'}</em>
@@ -99,13 +104,12 @@ function sleepTab() {
       }).join('')}</div>
     </div>
     ${trendCard()}
-    <div class="card"><div class="card-h"><b>24 jam terakhir</b></div>${timeline24()}</div>
-    <div class="sec-h"><h3>Sesi tidur</h3></div>
-    <div class="card list">${store.s.sleep.slice(-8).reverse().map(x => `<div class="row">
+    <div class="sec-h"><h3>Sesi terakhir</h3></div>
+    <div class="card list">${store.s.sleep.slice(-5).reverse().map(x => `<div class="row">
       <span class="row-ic tone-ok">${ic(x.end ? 'moon' : 'moonStar', 18)}</span>
       <span class="row-main"><b>${fmtTime(x.start)} – ${x.end ? fmtTime(x.end) : 'sekarang'}</b><small>${fmtDay(x.start)}</small></span>
-      <b class="mono">${fmtDur((x.end || Date.now()) - x.start)}</b></div>`).join('') || `<p class="muted small pad-s">Sesi tidur tercatat otomatis saat bayi tenang beberapa menit.</p>`}</div>
-    <button class="btn btn-soft btn-lg" data-act="printReport">${ic('download', 18)} Laporan untuk dokter anak (PDF)</button>`;
+      <b class="mono">${fmtDur((x.end || Date.now()) - x.start)}</b></div>`).join('') || `<p class="muted small pad-s">Belum ada</p>`}</div>
+    <button class="btn btn-soft btn-lg" data-act="printReport">${ic('download', 18)} Laporan PDF untuk dokter</button>`;
 }
 
 /** Perbandingan minggu ini vs minggu lalu dalam kalimat sederhana */
@@ -125,11 +129,11 @@ function trendCard() {
   const diff = k => (cur[k] != null && prev[k] != null ? cur[k] - prev[k] : null);
   const bedD = diff('bed');
   return `<div class="card trend">
-    <div class="card-h"><b>${ic('chart', 16)} Tren 7 hari</b><small>${comparable ? 'dibanding minggu lalu' : 'butuh data minggu lalu untuk perbandingan'}</small></div>
-    ${row('moon', 'tidur per hari', fmtDur(cur.total), diff('total'), 'ms', true, fmtDur)}
-    ${row('moonStar', 'tidur malam (18.00–07.00)', fmtDur(cur.night), diff('night'), 'ms', true, fmtDur)}
-    ${cur.bed != null ? row('bed', 'rata-rata mulai tidur malam', clock(cur.bed), bedD, 'min', false, m => `${Math.round(m)} mnt ${bedD > 0 ? 'lebih larut' : 'lebih awal'}`) : ''}
-    ${row('sun', 'tidur siang per hari', `${cur.naps.toFixed(1).replace('.', ',')}×`, diff('naps'), 'x', true, x => `${x.toFixed(1).replace('.', ',')}×`)}
+    <div class="card-h"><b>${ic('chart', 16)} Tren 7 hari</b><small>${comparable ? 'vs minggu lalu' : ''}</small></div>
+    ${row('moon', 'per hari', fmtDur(cur.total), diff('total'), 'ms', true, fmtDur)}
+    ${row('moonStar', 'malam', fmtDur(cur.night), diff('night'), 'ms', true, fmtDur)}
+    ${cur.bed != null ? row('bed', 'mulai tidur', clock(cur.bed), bedD, 'min', false, m => `${Math.round(m)} mnt ${bedD > 0 ? 'lebih larut' : 'lebih awal'}`) : ''}
+    ${row('sun', 'tidur siang', `${cur.naps.toFixed(1).replace('.', ',')}×`, diff('naps'), 'x', true, x => `${x.toFixed(1).replace('.', ',')}×`)}
   </div>`;
 }
 
@@ -167,17 +171,17 @@ function growthTab() {
   const list = [...store.s.growth].sort((a, b) => new Date(a.date) - new Date(b.date));
   const last = list.at(-1), prev = list.at(-2);
   const ms = store.s.milestones;
-  return `${last ? `<div class="stats">
-      <div class="stat"><span class="tone-pri">${ic('baby', 18)}</span><b>${last.weight}<small> kg</small></b><small>${prev ? `${last.weight - prev.weight >= 0 ? '+' : ''}${(last.weight - prev.weight).toFixed(1)} kg` : 'berat'}</small></div>
-      <div class="stat"><span class="tone-info">${ic('ruler', 18)}</span><b>${last.height}<small> cm</small></b><small>panjang</small></div>
-      <div class="stat"><span class="tone-ok">${ic('smile', 18)}</span><b>${last.head}<small> cm</small></b><small>lingkar kepala</small></div>
+  return `${last ? `<div class="sum card">
+      <div><span class="tone-pri">${ic('baby', 18)}</span><b>${last.weight}<small> kg</small></b><small>${prev ? `${last.weight - prev.weight >= 0 ? '+' : ''}${(last.weight - prev.weight).toFixed(1)} kg` : 'berat'}</small></div>
+      <div><span class="tone-info">${ic('ruler', 18)}</span><b>${last.height}<small> cm</small></b><small>panjang</small></div>
+      <div><span class="tone-ok">${ic('smile', 18)}</span><b>${last.head}<small> cm</small></b><small>kepala</small></div>
     </div>
-    <div class="card"><div class="card-h"><b>Berat badan</b><small><i class="lg-line"></i>${esc(store.s.baby.name)} <i class="lg-med"></i>median WHO</small></div>${growthChart(list)}<small class="muted">Umur (bulan) · data terakhir ${fmtDay(new Date(last.date).getTime())}</small></div>` : empty('ruler', 'Belum ada data pengukuran')}
+    <div class="card"><div class="card-h"><b>Berat badan</b><small><i class="lg-line"></i>${esc(store.s.baby.name)} <i class="lg-med"></i>median WHO</small></div>${growthChart(list)}<small class="muted">Umur (bulan)</small></div>` : empty('ruler', 'Belum ada data pengukuran')}
     <button class="btn btn-pri btn-lg" data-act="growthSheet">${ic('plus', 18)} Catat pengukuran</button>
     <div class="sec-h"><h3>Milestone</h3><small class="muted">usia ${babyAge(store.s.baby.birth)}</small></div>
     <div class="card list">${MILESTONES.map(([k, l, age]) => `<button class="row" data-act="toggleMilestone" data-k="${k}">
       <span class="check ${ms[k] ? 'on' : ''}">${ic('check', 14)}</span>
-      <span class="row-main"><b>${l}</b><small>Umumnya ${age}</small></span></button>`).join('')}</div>`;
+      <span class="row-main"><b>${l}</b><small>${age}</small></span></button>`).join('')}</div>`;
 }
 actions.toggleMilestone = el => {
   const k = el.dataset.k;

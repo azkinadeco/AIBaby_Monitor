@@ -23,7 +23,7 @@ route('more', {
       <div class="mtiles">
         ${tile('devices', 'radio', 'Perangkat', L.tone === 'muted' ? 'pri' : L.tone)}
         ${s.mode === 'baby' ? tile('babycam', 'cctv', 'Kamera', 'accent') : ''}
-        ${tile('settings', 'bell', 'Alarm', 'warn')}
+        ${tile('settings', 'settings', 'Pengaturan', 'warn')}
         ${tile('act:pinSheet', 'lock', 'Kunci', 'ok', dot(!!s.settings.pinHash))}
         ${tile('report', 'moonStar', 'Semalam', 'accent')}
         ${tile('journal?tab=sleep', 'chart', 'Statistik', 'info')}
@@ -91,61 +91,52 @@ function detTile(t, label) {
     <div class="det-sens" role="group" aria-label="Sensitivitas ${label}">${[1, 2, 3].map(n => `<button data-act="detSens" data-t="${t}" data-v="${n}" class="${d.on && lv >= n ? 'f' : ''}" aria-label="${SENS[n - 1]}"></button>`).join('')}</div>
   </div>`;
 }
-function opts(path, list, val) {
-  return `<div class="opts">${list.map(([v, i, l]) => `<button class="opt ${String(val) === String(v) ? 'on' : ''}" data-act="setOpt" data-path="${path}" data-v="${v}">${ic(i, 20)}<span>${l}</span></button>`).join('')}</div>`;
-}
 route('settings', {
   render() {
     const S = store.s.settings, A = S.alarm;
     const row = (icon, title, ctl) => `<div class="set-row"><span class="set-ic">${ic(icon, 17)}</span><div class="set-main"><b>${title}</b></div>${ctl}</div>`;
-    return topbar('Alarm & deteksi') + `<div class="stack">
-      <div class="sec-h"><h3>${ic('sparkles', 16)} Deteksi</h3></div>
+    const sub = (html) => `<div class="set-sub">${html}</div>`;
+    return topbar('Pengaturan') + `<div class="stack set-page">
+      <h4 class="grp">Deteksi</h4>
       <div class="det-grid">${detTile('cry', 'Tangisan')}${detTile('motion', 'Gelisah')}${detTile('wake', 'Terbangun')}</div>
       <details class="card more-det"><summary>${ic('flask', 16)} Lanjutan <small>· demo</small>${ic('chevD', 16)}</summary>
         <div class="det-grid">${detTile('position', 'Tengkurap')}${detTile('vomit', 'Muntah')}${detTile('breath', 'Napas')}</div>
       </details>
 
-      <div class="sec-h"><h3>${ic('volume', 16)} Bunyi alarm</h3></div>
-      ${opts('settings.alarm.sound', [['siren', 'alert', 'Sirene'], ['chime', 'bell', 'Lonceng'], ['voice', 'mic', 'Suara saja']], A.sound)}
-      <div class="vol card">${ic('volumeX', 18)}<input type="range" min="20" max="100" step="5" value="${A.volume}" data-set="settings.alarm.volume" data-num data-out="#vol-out" data-unit="%" aria-label="Volume alarm">${ic('volume', 18)}<b id="vol-out">${A.volume}%</b></div>
+      <h4 class="grp">Alarm</h4>
       <div class="card">
+        ${sub(seg('settings.alarm.sound', [['siren', 'Sirene'], ['chime', 'Lonceng'], ['voice', 'Suara']], A.sound))}
+        <div class="vol">${ic('volumeX', 18)}<input type="range" min="20" max="100" step="5" value="${A.volume}" data-set="settings.alarm.volume" data-num data-out="#vol-out" data-unit="%" aria-label="Volume alarm"><b id="vol-out">${A.volume}%</b><button class="vol-test" data-act="testAlarm" aria-label="Tes bunyi alarm">${ic('play', 16)}</button></div>
         ${row('mic', 'Suara peringatan', toggle('settings.alarm.voice', A.voice, { label: 'Suara peringatan' }))}
         ${row('activity', 'Getar', toggle('settings.alarm.vibrate', A.vibrate, { label: 'Getar' }))}
-        ${clipsSupported() ? row('video', 'Klip video kejadian', toggle('settings.clips', S.clips !== false, { label: 'Klip video' })) : ''}
         ${row('bell', 'Notifikasi', toggle('settings.alarm.notify', A.notify, { after: 'askNotify', label: 'Notifikasi' }))}
+        ${clipsSupported() ? row('video', 'Simpan klip video', toggle('settings.clips', S.clips !== false, { label: 'Klip video' })) : ''}
         ${row('moon', 'Jam tenang', toggle('settings.alarm.quiet.on', A.quiet.on, { after: 'rerender', label: 'Jam tenang' }))}
-        ${A.quiet.on ? `<div class="times">${ic('moon', 16)}<input type="time" value="${A.quiet.from}" data-set="settings.alarm.quiet.from" aria-label="Mulai"><span>–</span><input type="time" value="${A.quiet.to}" data-set="settings.alarm.quiet.to" aria-label="Selesai"></div>` : ''}
+        ${A.quiet.on ? `<div class="times"><input type="time" value="${A.quiet.from}" data-set="settings.alarm.quiet.from" aria-label="Mulai"><span>–</span><input type="time" value="${A.quiet.to}" data-set="settings.alarm.quiet.to" aria-label="Selesai"></div>` : ''}
       </div>
-      <button class="btn btn-soft btn-lg" data-act="testAlarm">${ic('play', 18)} Tes bunyi alarm</button>
 
-      <div class="sec-h"><h3>${ic('music', 16)} Penenang otomatis</h3></div>
+      <h4 class="grp">Otomatis</h4>
       <div class="card">
-        ${row('sparkles', 'Otomatis saat menangis', toggle('settings.alarm.autoSoothe', A.autoSoothe, { after: 'rerender', label: 'Penenang otomatis' }))}
-        ${A.autoSoothe ? `<div class="set-sub"><select data-set="settings.alarm.sootheTrack" aria-label="Pilih penenang">${Object.entries(TRACKS).map(([k, t]) => `<option value="${k}" ${A.sootheTrack === k ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
-          ${seg('settings.alarm.sootheMins', [[10, '10m'], [20, '20m'], [45, '45m']], A.sootheMins, { num: true })}</div>` : ''}
+        ${row('music', 'Penenang saat menangis', toggle('settings.alarm.autoSoothe', A.autoSoothe, { after: 'rerender', label: 'Penenang otomatis' }))}
+        ${A.autoSoothe ? sub(`<select data-set="settings.alarm.sootheTrack" aria-label="Pilih penenang">${Object.entries(TRACKS).map(([k, t]) => `<option value="${k}" ${A.sootheTrack === k ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
+          ${seg('settings.alarm.sootheMins', [[10, '10m'], [20, '20m'], [45, '45m']], A.sootheMins, { num: true })}`) : ''}
+        ${row('bottle', 'Pengingat menyusu', '')}
+        ${sub(seg('settings.feedEvery', [[0, 'Mati'], [120, '2j'], [150, '2,5j'], [180, '3j'], [240, '4j']], S.feedEvery, { num: true }))}
       </div>
 
-      <div class="sec-h"><h3>${ic('bottle', 16)} Pengingat menyusu</h3></div>
+      <h4 class="grp">Tampilan</h4>
       <div class="card">
-        ${seg('settings.feedEvery', [[0, 'Mati'], [120, '2 j'], [150, '2,5 j'], [180, '3 j'], [240, '4 j']], S.feedEvery, { num: true })}
+        ${sub(seg('settings.theme', [['auto', 'Otomatis'], ['light', 'Terang'], ['dark', 'Gelap']], S.theme, { after: 'themeChanged' }))}
+        ${store.s.mode === 'baby' ? row('moon', 'Redupkan layar kamera', toggle('settings.babyDim', S.babyDim)) : ''}
       </div>
-
-      <div class="sec-h"><h3>${ic('sun', 16)} Tampilan</h3></div>
-      ${opts('settings.theme', [['auto', 'sparkles', 'Otomatis'], ['light', 'sun', 'Terang'], ['dark', 'moon', 'Gelap']], S.theme)}
-      ${store.s.mode === 'baby' ? `<div class="card">${row('moon', 'Redupkan layar kamera', toggle('settings.babyDim', S.babyDim))}</div>` : ''}
       ${disclaimer()}
     </div>`;
   },
 });
 actions.detToggle = el => { const d = store.s.settings.detect[el.dataset.t]; d.on = !d.on; store.save(); router.refresh(); };
 actions.detSens = el => { const d = store.s.settings.detect[el.dataset.t]; d.on = true; d.sens = SENS[+el.dataset.v - 1]; store.save(); router.refresh(); };
-actions.setOpt = el => {
-  const v = el.dataset.v;
-  store.set(el.dataset.path, isNaN(+v) ? v : +v);
-  if (el.dataset.path === 'settings.theme') applyTheme();
-  router.refresh();
-};
 actions.rerender = () => router.refresh();
+actions.themeChanged = () => applyTheme();
 actions.askNotify = el => {
   if (el.checked && 'Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission().then(p => toast(p === 'granted' ? 'Notifikasi diizinkan' : 'Notifikasi ditolak browser', { icon: 'bell' }));
@@ -241,7 +232,7 @@ route('help', {
       ['Apakah alarm berbunyi saat HP terkunci?', 'Browser HP membatasi suara saat aplikasi ditutup atau layar terkunci. Gunakan <b>Mode tidur</b>: layar dibuat hampir hitam namun tetap menyala, sehingga alarm pasti terdengar. Colokkan pengisi daya.'],
       ['Apakah video saya aman?', 'Video & suara mengalir langsung antar-HP (WebRTC, terenkripsi). Server hanya dipakai untuk memperkenalkan kedua HP. Orang tanpa kunci 6 angka akan ditolak. Tidak ada video yang disimpan di server.'],
       ['Kenapa tidak tersambung?', 'Pastikan aplikasi di HP kamera tetap terbuka dan statusnya “Siap”. Jaringan seluler tertentu memblokir koneksi langsung — coba sambungkan kedua HP ke Wi-Fi yang sama.'],
-      ['Apakah AI bisa salah?', 'Bisa. Kipas angin, TV, atau cahaya yang berubah dapat memicu alarm palsu; selimut tebal bisa meredam gerakan. Tandai “Alarm palsu” dan atur sensitivitas di Alarm & deteksi. Aplikasi ini bukan alat medis.'],
+      ['Apakah AI bisa salah?', 'Bisa. Kipas angin, TV, atau cahaya yang berubah dapat memicu alarm palsu; selimut tebal bisa meredam gerakan. Tandai “Alarm palsu” dan atur sensitivitas di Pengaturan. Aplikasi ini bukan alat medis.'],
     ];
     return topbar('Bantuan') + `<div class="stack">
       <div class="card list">${faq.map(([q, a]) => `<details class="faq"><summary>${q}${ic('chevD', 18)}</summary><p>${a}</p></details>`).join('')}</div>

@@ -189,9 +189,10 @@ export const store = {
     this.save();
     bus.emit('events');
   },
-  addCare(type, detail) {
-    const item = { id: 'c' + uid(), type, detail, ts: Date.now(), by: s.parentName || 'Bunda' };
+  addCare(type, detail, ts = Date.now(), by = s.parentName || 'Bunda') {
+    const item = { id: 'c' + uid(), type, detail, ts, by };
     s.care.unshift(item);
+    s.care.sort((a, b) => b.ts - a.ts);
     this.save();
     bus.emit('care');
     bus.emit('care:add', item);

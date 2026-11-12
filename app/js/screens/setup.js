@@ -16,14 +16,24 @@ import { linkLabel } from './shared.js';
 route('welcome', {
   render() {
     return `<div class="welcome">
-      <div class="wl-sky" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="wl-logo">${logo(64)}</div>
-      <h1>Tidur nyenyak.<br><em>Si kecil tetap terjaga.</em></h1>
-      <p>Pakai dua HP: satu di kamar bayi sebagai kamera, satu di tanganmu sebagai monitor dengan alarm.</p>
-      <div class="choices">
-        <button class="choice" data-go="connect"><span class="choice-ic tone-pri">${ic('phone', 24)}</span><span><b>HP ini untuk orang tua</b><small>Lihat, dengar, dan terima alarm</small></span>${ic('chevR', 18)}</button>
-        <button class="choice" data-go="babycam"><span class="choice-ic tone-accent">${ic('cctv', 24)}</span><span><b>Jadikan HP ini kamera bayi</b><small>HP lama pun bisa — letakkan dekat boks</small></span>${ic('chevR', 18)}</button>
-        <button class="choice ghost" data-act="startDemo"><span class="choice-ic">${ic('flask', 22)}</span><span><b>Coba dulu (mode demo)</b><small>Bayi simulasi, tanpa perangkat</small></span>${ic('chevR', 18)}</button>
+      <div class="wl-hero" aria-hidden="true">
+        <div class="wl-sky"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="wl-moon"></div>
+        <div class="wl-ill">
+          <div class="wl-dev"><span class="wl-scr">${ic('cctv', 26)}</span><small>Kamar bayi</small></div>
+          <div class="wl-link"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="wl-dev pri"><span class="wl-scr">${ic('phone', 26)}<em class="wl-ping">${ic('bell', 11)}</em></span><small>Orang tua</small></div>
+        </div>
+      </div>
+      <div class="wl-body">
+        <div class="wl-brand">${logo(20)}<b>AI Baby Monitor</b></div>
+        <h1>Tidur tenang,<br><em>si kecil terpantau.</em></h1>
+        <p class="wl-q">Gunakan HP ini sebagai</p>
+        <div class="wl-pick">
+          <button class="wl-opt pri" data-go="connect"><span>${ic('phone', 24)}</span><b>Monitor</b><small>untuk orang tua</small></button>
+          <button class="wl-opt" data-go="babycam"><span>${ic('cctv', 24)}</span><b>Kamera</b><small>di kamar bayi</small></button>
+        </div>
+        <button class="wl-demo" data-act="startDemo">${ic('play', 14)} Coba demo dulu</button>
       </div>
     </div>`;
   },
